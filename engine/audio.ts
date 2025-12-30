@@ -1,9 +1,17 @@
+
 import { RADIO_CHANNELS, MAX_SPEED, TRAFFIC_ANNOUNCEMENTS, WEATHER_FORECASTS, NEWS_HEADLINES } from '../constants';
 
 export class AudioEngine {
   private ctx: AudioContext | null = null;
-  private engineOsc: OscillatorNode | null = null;
+  // Multi-oscillator setup for sporty sound
+  private oscMain: OscillatorNode | null = null;
+  private oscDetune: OscillatorNode | null = null;
+  private oscSub: OscillatorNode | null = null;
   private engineGain: GainNode | null = null;
+  private engineFilter: BiquadFilterNode | null = null; // Lowpass to remove "buzz"
+  private engineDistortion: WaveShaperNode | null = null; // Add grit at high RPM
+  private rumbleLFO: OscillatorNode | null = null; // Modulate amplitude for V8 throb
+  
   private musicAudio: HTMLAudioElement | null = null;
   private analyser: AnalyserNode | null = null;
   private activeUtterance: SpeechSynthesisUtterance | null = null;
@@ -34,25 +42,124 @@ export class AudioEngine {
       this.currentStage = stage;
   }
 
+  public setMusicVolume(volume: number) {
+      this.musicVolume = Math.max(0, Math.min(1, volume));
+      if (this.musicAudio) {
+          this.musicAudio.volume = this.musicVolume;
+      }
+  }
+
+  // Create a sigmoid distortion curve
+  private makeDistortionCurve(amount: number): Float32Array {
+      const k = typeof amount === 'number' ? amount : 50;
+      const n_samples = 44100;
+      const curve = new Float32Array(n_samples);
+      const deg = Math.PI / 180;
+      for (let i = 0; i < n_samples; ++i) {
+        const x = i * 2 / n_samples - 1;
+        curve[i] = (3 + k) * x * 20 * deg / (Math.PI + k * Math.abs(x));
+      }
+      return curve;
+  }
+
   private startEngineSound() {
     if (!this.ctx) return;
-    this.engineOsc = this.ctx.createOscillator();
-    this.engineGain = this.ctx.createGain();
     
-    this.engineOsc.type = 'sawtooth';
-    this.engineOsc.frequency.value = 50;
+    // Master Gain for Engine
+    this.engineGain = this.ctx.createGain();
+    this.engineGain.connect(this.ctx.destination);
     this.engineGain.gain.value = 0.1;
 
-    this.engineOsc.connect(this.engineGain);
-    this.engineGain.connect(this.ctx.destination);
-    this.engineOsc.start();
+    // Distortion (Drive) - Comes after Osc, before Filter or after Filter? 
+    // Osc -> Filter -> Distortion -> Gain usually sounds like a screaming exhaust.
+    this.engineDistortion = this.ctx.createWaveShaper();
+    this.engineDistortion.curve = this.makeDistortionCurve(0); // Start clean
+    this.engineDistortion.oversample = '4x';
+    this.engineDistortion.connect(this.engineGain);
+
+    // Filter to cut high frequencies (makes it sound like an engine, not a laser)
+    this.engineFilter = this.ctx.createBiquadFilter();
+    this.engineFilter.type = 'lowpass';
+    this.engineFilter.frequency.value = 200; // Start low (idle)
+    this.engineFilter.Q.value = 2; // Resonance for the "whine"
+    this.engineFilter.connect(this.engineDistortion);
+
+    // 1. Main Tone (Sawtooth for richness)
+    this.oscMain = this.ctx.createOscillator();
+    this.oscMain.type = 'sawtooth';
+    this.oscMain.frequency.value = 60; // Lower pitch
+    this.oscMain.connect(this.engineFilter);
+
+    // 2. Detuned Tone (Thickens sound, Chorus effect)
+    this.oscDetune = this.ctx.createOscillator();
+    this.oscDetune.type = 'sawtooth';
+    this.oscDetune.frequency.value = 60; 
+    this.oscDetune.detune.value = 15; 
+    this.oscDetune.connect(this.engineFilter);
+
+    // 3. Sub Rumble (Square for aggressive low end)
+    this.oscSub = this.ctx.createOscillator();
+    this.oscSub.type = 'square';
+    this.oscSub.frequency.value = 30; // Sub-bass
+    const subGain = this.ctx.createGain();
+    subGain.gain.value = 0.5; 
+    this.oscSub.connect(subGain);
+    subGain.connect(this.engineFilter);
+
+    // 4. Rumble LFO (Amplitude Modulation to simulate cylinder firing)
+    this.rumbleLFO = this.ctx.createOscillator();
+    this.rumbleLFO.type = 'sine';
+    this.rumbleLFO.frequency.value = 15; // Idle rumble speed
+    
+    const lfoGain = this.ctx.createGain();
+    lfoGain.gain.value = 0.05; // Modulation depth
+    
+    this.rumbleLFO.connect(lfoGain);
+    lfoGain.connect(this.engineGain.gain); // Modulate volume
+
+    this.oscMain.start();
+    this.oscDetune.start();
+    this.oscSub.start();
+    this.rumbleLFO.start();
   }
 
   public setEnginePitch(speed: number) {
-    if (this.engineOsc && this.ctx) {
+    if (this.ctx && this.engineGain && this.oscMain && this.oscDetune && this.oscSub && this.engineFilter && this.rumbleLFO && this.engineDistortion) {
       const ratio = speed / MAX_SPEED;
-      this.engineOsc.frequency.setValueAtTime(50 + (ratio * 150), this.ctx.currentTime);
-      if (this.engineGain) this.engineGain.gain.value = 0.05 + (ratio * 0.1);
+      
+      // Pitch scaling: 60Hz (Idle) -> 550Hz (Redline Scream)
+      const baseFreq = 60 + (ratio * 500); 
+      
+      // Filter opens up aggressively as you speed up. 
+      // At max speed, it lets almost everything through for that "raw" sound.
+      const filterFreq = 200 + (ratio * 5000); 
+
+      // Distortion amount increases with RPM to simulate engine roar
+      // Create new curve on fly might be expensive, so we just switch curves or pre-calc?
+      // Actually, simple gain into waveshaper controls distortion amount, but here we update curve or input gain.
+      // Let's just update the curve occasionally or assume a fixed curve.
+      // Better: Use the ratio to control Q factor and Detune.
+      
+      // Rumble speed increases with RPM
+      const rumbleSpeed = 15 + (ratio * 50);
+
+      this.oscMain.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.1);
+      this.oscDetune.frequency.setTargetAtTime(baseFreq, this.ctx.currentTime, 0.1);
+      this.oscSub.frequency.setTargetAtTime(baseFreq * 0.5, this.ctx.currentTime, 0.1);
+      
+      this.engineFilter.frequency.setTargetAtTime(filterFreq, this.ctx.currentTime, 0.1);
+      // Resonance increases slightly at mid range then drops
+      this.engineFilter.Q.setTargetAtTime(1 + (Math.sin(ratio * Math.PI) * 3), this.ctx.currentTime, 0.1);
+
+      this.rumbleLFO.frequency.setTargetAtTime(rumbleSpeed, this.ctx.currentTime, 0.1);
+
+      // Base volume increases with load/speed
+      this.engineGain.gain.setTargetAtTime(0.1 + (ratio * 0.1), this.ctx.currentTime, 0.1);
+      
+      // Apply distortion curve based on speed (simulated drive)
+      // Only update occasionally to save CPU, or just set a static gritty curve.
+      // Let's stick to a static curve initiated in startEngineSound, but maybe we can tweak detune
+      this.oscDetune.detune.setTargetAtTime(15 + (ratio * 20), this.ctx.currentTime, 0.1);
     }
   }
 
@@ -90,6 +197,11 @@ export class AudioEngine {
     this.isSpeaking = false;
     this.newsQueue = [];
 
+    // Handle Radio OFF
+    if (channel.name === 'RADIO OFF') {
+        return; 
+    }
+
     if (channel.url === 'TTS') {
         this.startNewsCycle();
     } else if (channel.url) {
@@ -105,7 +217,8 @@ export class AudioEngine {
       if (this.musicAudio) {
           const target = duck ? 0.2 : 0.6;
           this.musicAudio.volume = target;
-          this.musicVolume = target;
+          this.musicVolume = target; // Update master volume to restore later? No, that would lose user setting.
+          // FIX: Don't overwrite master setting, just temp duck
       }
   }
 
@@ -213,7 +326,9 @@ export class AudioEngine {
   }
 
   // --- TRAFFIC ANNOUNCEMENT SYSTEM ---
-  public playTrafficAnnouncement(stage: number) {
+  public playTrafficAnnouncement(stage: number, onStart?: () => void, onEnd?: () => void) {
+      if (this.getCurrentChannelName() === 'RADIO OFF') return;
+
       const text = TRAFFIC_ANNOUNCEMENTS[stage];
       if (!text) return;
 
@@ -223,6 +338,7 @@ export class AudioEngine {
       this.duckMusic(true);
       
       this.playJingle('TRAFFIC', () => {
+          if (onStart) onStart();
           const utterance = new SpeechSynthesisUtterance(text);
           utterance.lang = 'fi-FI';
           utterance.pitch = 0.9;
@@ -232,6 +348,7 @@ export class AudioEngine {
           utterance.onend = () => {
               this.activeUtterance = null;
               this.duckMusic(false);
+              if (onEnd) onEnd();
               // Check if we were on News Channel, if so restart cycle after pause
               if (this.getCurrentChannelName() === 'AI NEWS') {
                    setTimeout(() => this.startNewsCycle(), 2000);
@@ -295,6 +412,8 @@ export class AudioEngine {
   }
 
   public playCheckpointSound() {
+      if (this.getCurrentChannelName() === 'RADIO OFF') return;
+
       // Prioritize this over news, but not over traffic ideally, but simple overwrite is fine
       window.speechSynthesis.cancel();
       const utterance = new SpeechSynthesisUtterance("Check Point!");
@@ -340,11 +459,17 @@ export class AudioEngine {
     this.analyser.getByteFrequencyData(dataArray);
     
     // Fallback animation if no audio playing or TTS
-    if ((!this.musicAudio || this.musicAudio.paused) && !window.speechSynthesis.speaking) {
-         for(let i=0; i<dataArray.length; i++) dataArray[i] = Math.random() * 50;
-    } else if (window.speechSynthesis.speaking) {
+    const isPlaying = this.musicAudio && !this.musicAudio.paused;
+    const isTalking = window.speechSynthesis.speaking;
+
+    if (!isPlaying && !isTalking) {
+         return new Uint8Array(0);
+    } else if (isTalking) {
          // Fake visualizer for speech
          for(let i=0; i<dataArray.length; i++) dataArray[i] = Math.random() * 150;
+    } else {
+         // Random visuals for music if analyser isn't hooked to element (CORS)
+         for(let i=0; i<dataArray.length; i++) dataArray[i] = Math.random() * 200;
     }
     
     return dataArray;

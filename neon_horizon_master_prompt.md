@@ -31,7 +31,7 @@
     *   HIGH: Max Speed ~293 km/h (Lower acceleration).
 *   **Collision:**
     *   Detect overlap with NPC cars.
-    *   **Crucial:** Set collision width tolerance to `0.25` (narrow) to allow tight overtakes.
+    *   **Crucial:** Set collision width tolerance to `0.25` (narrow) to allow tight overtakes. Do not use a wider box like 0.8.
 *   **Off-road:** Decelerate rapidly if `playerX` is > 1 or < -1.
 
 ## 3. Pseudo-3D Renderer (`engine/renderer.ts`)
@@ -52,6 +52,7 @@
 ## 4. Track Generation (`engine/track.ts`)
 
 *   Implement a `TrackEngine` class generating segments.
+*   **Road Variations:** Use `alterColorBrightness` to create procedural "patches" and imperfections on the road surface for visual variety.
 *   **Stages (Seamless transition):**
     1.  **Beach:** Palm Trees, Sand Dunes. (Bright Blue Sky).
     2.  **Desert:** Cacti, Billboards. (Heat Haze).

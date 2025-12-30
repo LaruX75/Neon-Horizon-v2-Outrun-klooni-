@@ -1,4 +1,8 @@
 
+
+
+
+
 // Physics & Camera
 export const FPS = 60;
 export const STEP = 1 / FPS;
@@ -33,6 +37,7 @@ export const TRAFFIC_SPEED = 4000;
 export const INITIAL_TIME = 75; // More time for the scenic route
 export const CHECKPOINT_BONUS = 45; 
 export const STAGE_LENGTH = 3000 * SEGMENT_LENGTH; 
+export const VICTORY_DURATION = 150; // 2.5 minutes in seconds
 
 // Colors (Palette)
 export const COLORS = {
@@ -43,26 +48,43 @@ export const COLORS = {
     DUSK: ['#224488', '#ff9966'],
     NIGHT: ['#001133', '#000011'],
     // Stage 5 Special
-    LAKESIDE: { top: [80, 0, 100], bottom: [255, 100, 50], terrain: [20, 0, 40], cloud: [255, 180, 200] }
+    LAKESIDE: { top: [80, 0, 100], bottom: [255, 100, 50], terrain: [20, 0, 40], cloud: [255, 180, 200] },
+    // Stage 6 Special (Final City)
+    FINAL_CITY: { top: [10, 0, 30], bottom: [255, 140, 0], terrain: [10, 10, 20], cloud: [200, 100, 200] }
   },
   ROAD: {
-    // Beach / Sega Arcade Style - Brighter Sand
+    // Stage 1: Beach (Bright Sand)
     LIGHT: { road: '#999999', grass: '#eecfaa', rumble: '#555555', lane: '#CCCCCC' }, 
     DARK: { road: '#888888', grass: '#e4c4a0', rumble: '#bb0000', lane: '#888888' },
-    // Keep synthwave for later stages if needed, or make it sunset style
-    NIGHT_LIGHT: { road: '#222244', grass: '#000000', rumble: '#00ffff', lane: '#ff00ff' },
-    NIGHT_DARK: { road: '#1a1a3a', grass: '#0a0a1a', rumble: '#222244', lane: '#1a1a3a' },
-    // Stage 5 Special - Chrome/Purple road
+    
+    // Stage 2: Desert (Redder Sand, darker road)
+    DESERT_LIGHT: { road: '#a08080', grass: '#d0a060', rumble: '#885522', lane: '#CCCCCC' },
+    DESERT_DARK: { road: '#907070', grass: '#c09050', rumble: '#bb0000', lane: '#aaaaaa' },
+
+    // Stage 3: City (Grey Asphalt, Dark Ground)
+    CITY_LIGHT: { road: '#555555', grass: '#222222', rumble: '#ffffff', lane: '#ffffff' },
+    CITY_DARK: { road: '#444444', grass: '#111111', rumble: '#ff0000', lane: '#aaaaaa' },
+
+    // Stage 4: Forest (Green Grass)
+    FOREST_LIGHT: { road: '#777777', grass: '#44aa44', rumble: '#ffffff', lane: '#cccccc' },
+    FOREST_DARK: { road: '#666666', grass: '#339933', rumble: '#aa0000', lane: '#999999' },
+
+    // Stage 5: Lakeside (Retro/Synthwave)
     LAKESIDE_LIGHT: { road: '#332244', grass: '#000000', rumble: '#00ffff', lane: '#ff00ff' }, // Grass is transparent/water
-    LAKESIDE_DARK: { road: '#2a1a3a', grass: '#000000', rumble: '#ff00aa', lane: '#553366' }
+    LAKESIDE_DARK: { road: '#2a1a3a', grass: '#000000', rumble: '#ff00aa', lane: '#553366' },
+    
+    // Stage 6: Final City (Dark Asphalt, Neon trim)
+    FINAL_LIGHT: { road: '#222', grass: '#111', rumble: '#ff00ff', lane: '#fff' },
+    FINAL_DARK: { road: '#181818', grass: '#050505', rumble: '#00ffff', lane: '#aaa' }
   }
 };
 
 export const RADIO_CHANNELS = [
-  { name: "SPLASH WAVE", freq: "88.5 FM", url: "https://larux75.github.io/app-resources/radio1.mp3" }, 
-  { name: "MAGICAL SOUND", freq: "92.4 FM", url: "https://larux75.github.io/app-resources/radio2.mp3" }, 
-  { name: "PASSING BREEZE", freq: "96.8 FM", url: "https://larux75.github.io/app-resources/radio3.mp3" }, 
-  { name: "AI NEWS", freq: "101.2 FM", url: "TTS" }
+  { name: "NEON FM", freq: "88.5 FM", url: "https://larux75.github.io/app-resources/radio1.mp3", track: "MIDNIGHT CITY" }, 
+  { name: "RETRO HITS", freq: "92.4 FM", url: "https://larux75.github.io/app-resources/radio2.mp3", track: "SELF CONTROL" }, 
+  { name: "TURBO DRIVE", freq: "96.8 FM", url: "https://larux75.github.io/app-resources/radio3.mp3", track: "DANGER ZONE" }, 
+  { name: "AI NEWS", freq: "101.2 FM", url: "TTS", track: "TRAFFIC UPDATE" },
+  { name: "RADIO OFF", freq: "OFF", url: "", track: "STANDBY" }
 ];
 
 export const TRAFFIC_ANNOUNCEMENTS: Record<number, string> = {
@@ -70,7 +92,8 @@ export const TRAFFIC_ANNOUNCEMENTS: Record<number, string> = {
   2: "Aavikon pitkällä suoralla on havaittu hiekan alle hautautuneita esteitä, jotka voivat vaurioittaa alustaa kovassa vauhdissa.",
   3: "Keskustan neonvalojen alla vallitsee kova iltaruuhka, ja taksit vaihtavat kaistaa ilman varoitusta neulansilmämutkissa.",
   4: "Pohjoisella metsätaipaleella on nähty hirviä tien välittömässä läheisyydessä, joten pitäkää katseenne tiukasti horisontissa.",
-  5: "Järvenrantatiellä on paikoin öljyä asfaltilla, mikä tekee tiukoista mutkista erittäin vaarallisia jopa kokeneille kuljettajille."
+  5: "Järvenrantatiellä on paikoin öljyä asfaltilla, mikä tekee tiukoista mutkista erittäin vaarallisia jopa kokeneille kuljettajille.",
+  6: "Olet saapumassa Neon Cityn finaaliosuudelle. Kaupungin asukkaat ovat kerääntyneet kaduille katsomaan voittajaa. Valmistaudu ilotulitukseen!"
 };
 
 export const WEATHER_FORECASTS: Record<number, string> = {
@@ -78,7 +101,8 @@ export const WEATHER_FORECASTS: Record<number, string> = {
   2: "Aavikon yllä väreilee polttava helleaalto, joka saa horisontin näyttämään elävältä ja petolliselta. Voimakas puuskittainen tuuli saattaa pöllyttää hiekkaa tielle, mikä heikentää näkyvyyttä ja renkaiden pitoa pitkillä suorilla. Pidä huoli, ettei moottori ylikuumene tässä säälimättömässä kuumuudessa ennen seuraavaa keidasta.",
   3: "Kaupunki on verhoutunut sähköiseen yöilmaan, jossa kirkkaat neonvalot heijastuvat kosteasta asfaltista pienen tihkusateen jälkeen. Ilmanala on tyyni, mutta kapeat kadut ja pilvenpiirtäjien väliset varjot voivat kätkeä yllättäviä lätäköitä. Kaupungin syke ja viileä yöilma tarjoavat optimaaliset olosuhteet huippunopeuden testaamiseen ruuhkasta huolimatta.",
   4: "Pohjoinen sää yllättää kuljettajat matalalta paistavalla syysauringolla, joka häikäisee armottomasti metsätaipaleiden välissä. Tien pinta on paikoin kostea ja tien pientareilla saattaa näkyä varhaista aamukuuraa, mikä tekee neulansilmämutkista erittäin liukkaita. Ole valppaana hirvivaaran vuoksi, sillä hämärä laskeutuu mäntymetsän siimeksessä nopeammin kuin uskotkaan.",
-  5: "Järvenrannalla sää on tyyni ja pehmeä usva nousee vedenpinnasta peittäen osan tiestä mystiseen vaippaan. Lämpötila on miellyttävän leuto, mutta kosteus tekee mutkaisista rannikkoteistä haastavia kokeneellekin kuljettajalle. Nauti tyyneydestä ja veden kimalteesta, mutta älä anna rauhallisen maiseman hämätä sinua unohtamaan tiukkoja mutkia."
+  5: "Järvenrannalla sää on tyyni ja pehmeä usva nousee vedenpinnasta peittäen osan tiestä mystiseen vaippaan. Lämpötila on miellyttävän leuto, mutta kosteus tekee mutkaisista rannikkoteistä haastavia kokeneellekin kuljettajalle. Nauti tyyneydestä ja veden kimalteesta, mutta älä anna rauhallisen maiseman hämätä sinua unohtamaan tiukkoja mutkia.",
+  6: "Neon Cityn yllä aurinko tekee laskuaan ja värjää taivaan dramaattisiin purppuran ja oranssin sävyihin. Tuuli on tyyntynyt täysin ilotulitusta varten. Ilmassa on sähköä ja juhlan tuntua."
 };
 
 export const NEWS_HEADLINES = [

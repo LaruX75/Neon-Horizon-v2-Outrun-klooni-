@@ -1,5 +1,7 @@
+
 import React, { useEffect, useState } from 'react';
 import MusicVisualizer from './MusicVisualizer';
+import SegmentDisplay from './SegmentDisplay';
 import { RADIO_CHANNELS } from '../constants';
 
 interface HUDProps {
@@ -10,9 +12,17 @@ interface HUDProps {
     channelIndex: number;
     gear: 'LOW' | 'HIGH';
     stage: number;
+    volume?: number;
+    onVolumeChange?: (vol: number) => void;
+    onToggleRadio?: () => void;
+    trafficActive?: boolean;
+    onChannelSelect?: (index: number) => void;
 }
 
-const HUD: React.FC<HUDProps> = ({ speed, score, time, channelName, channelIndex, gear, stage }) => {
+const HUD: React.FC<HUDProps> = ({ 
+    speed, score, time, channelName, channelIndex, gear, stage, volume = 0.6, 
+    onVolumeChange, onToggleRadio, trafficActive, onChannelSelect 
+}) => {
     // Checkpoint Flash State
     const [flashCheckpoint, setFlashCheckpoint] = useState(false);
 
@@ -24,23 +34,34 @@ const HUD: React.FC<HUDProps> = ({ speed, score, time, channelName, channelIndex
         }
     }, [stage]);
 
+    // Handle Volume Wheel
+    const handleWheel = (e: React.WheelEvent) => {
+        if (onVolumeChange) {
+            // Scroll Up = Vol Up, Down = Vol Down
+            const delta = e.deltaY < 0 ? 0.05 : -0.05;
+            onVolumeChange(Math.max(0, Math.min(1, volume + delta)));
+        }
+    };
+
     // Speed display mapping (0-12000 -> 0-293 km/h)
     const displaySpeed = Math.floor((speed / 12000) * 293);
     
-    // RPM Calculation: 0 to 10000 RPM
-    // Max RPM depends on Gear. 
-    // Low Gear: Max speed 170 ~ 7000 RPM (Redline)
-    // High Gear: Max speed 293 ~ 9000 RPM (Redline)
+    // RPM Calculation
     const maxSpeedForGear = gear === 'LOW' ? 170 : 293;
     const rpmBase = (displaySpeed / maxSpeedForGear) * 8000;
     const rpmJitter = Math.random() * 50;
-    const rpm = Math.min(10000, Math.max(800, rpmBase + rpmJitter)); // Idle at 800
+    const rpm = Math.min(10000, Math.max(800, rpmBase + rpmJitter)); 
     
     // Gauge Logic
-    // 0 RPM = -135deg, 10000 RPM = +45deg (180deg sweep)
     const rpmRotation = -135 + (rpm / 10000) * 180;
+    const knobRotation = -135 + (volume * 270);
 
     const timeColor = time < 10 ? 'text-red-500 animate-pulse' : 'text-cyan-400';
+
+    // Helper for channel freq
+    const freqDisplay = channelIndex < 4 ? RADIO_CHANNELS[channelIndex].freq : '---';
+    // Helper for station name/status
+    const stationDisplay = channelIndex === 4 ? 'STANDBY' : channelName;
 
     return (
         <div className="absolute top-0 left-0 w-full h-full pointer-events-none p-4 flex flex-col justify-between z-10 text-white font-orbitron">
@@ -81,50 +102,134 @@ const HUD: React.FC<HUDProps> = ({ speed, score, time, channelName, channelIndex
             {/* Bottom Bar (Dashboard) */}
             <div className="flex justify-between items-end pb-4">
                 
-                {/* Car Stereo UI */}
-                <div className="pointer-events-auto bg-gray-900 border-2 border-gray-600 rounded-lg p-3 w-72 shadow-2xl flex flex-col gap-2 relative overflow-hidden">
-                    {/* Glossy Overlay */}
-                    <div className="absolute top-0 left-0 w-full h-1/2 bg-gradient-to-b from-white/10 to-transparent pointer-events-none"></div>
-
-                    <div className="flex justify-between items-center border-b border-gray-700 pb-2 mb-1">
-                        <div className="text-xs text-gray-400 font-bold tracking-widest">NEON FM</div>
+                {/* CAR RADIO UI */}
+                <div className="pointer-events-auto bg-gray-900 border-4 border-gray-800 rounded-lg w-80 shadow-2xl flex flex-col relative overflow-hidden font-sans">
+                    {/* Brand Header */}
+                    <div className="bg-gray-800 px-3 py-1 flex justify-between items-center border-b border-gray-950">
+                        <span className="text-[10px] tracking-[0.2em] font-bold text-gray-400 italic font-orbitron">BLASTPUNKT</span>
                         <div className="flex gap-1">
-                             <div className="w-2 h-2 rounded-full bg-red-500 animate-pulse shadow-[0_0_5px_red]"></div>
-                             <div className="text-[10px] text-red-400">STEREO</div>
+                             <div className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></div>
+                             <span className="text-[8px] text-gray-500">STEREO</span>
                         </div>
                     </div>
 
-                    {/* Display Screen */}
-                    <div className="bg-[#1a1a2e] border border-gray-700 rounded p-2 mb-2 relative overflow-hidden h-16 flex flex-col justify-center">
-                         <div className="absolute inset-0 bg-[linear-gradient(rgba(18,16,16,0)_50%,rgba(0,0,0,0.25)_50%),linear-gradient(90deg,rgba(255,0,0,0.06),rgba(0,255,0,0.02),rgba(0,0,255,0.06))] z-0 bg-[length:100%_2px,3px_100%] pointer-events-none"></div>
-                         <div className="relative z-10 flex justify-between items-end">
-                            <div>
-                                <div className="text-xs text-cyan-300 font-mono mb-1">CH-{channelIndex + 1} MEMORY</div>
-                                <div className="text-xl text-yellow-300 font-bold tracking-wider drop-shadow-[0_0_5px_rgba(253,224,71,0.5)]">
-                                    {channelIndex < RADIO_CHANNELS.length ? RADIO_CHANNELS[channelIndex].freq : '---'}
+                    {/* Main Panel */}
+                    <div className="p-3 bg-[#111] relative">
+                         
+                         {/* LCD Display */}
+                        <div 
+                            className="bg-[#05111a] border-2 border-gray-700 rounded mb-3 relative overflow-hidden h-20 flex flex-col justify-between p-2 shadow-[inset_0_0_15px_rgba(0,0,0,1)]"
+                        >
+                             {/* LCD Grid Background Effect */}
+                             <div className="absolute inset-0 pointer-events-none opacity-10" style={{ 
+                                 backgroundImage: 'linear-gradient(rgba(0, 255, 0, 0.8) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 255, 0, 0.8) 1px, transparent 1px)', 
+                                 backgroundSize: '4px 4px' 
+                             }}></div>
+                             
+                             <div className="absolute inset-0 pointer-events-none bg-gradient-to-b from-transparent via-white/5 to-transparent opacity-20 animate-pulse"></div>
+
+                             {/* Top Row: Info */}
+                             <div className="relative z-10 flex justify-between items-start leading-none h-6">
+                                {/* Frequency - Segment Display */}
+                                <SegmentDisplay 
+                                    text={freqDisplay} 
+                                    size={10} 
+                                    color="#22d3ee" 
+                                    dimColor="#164e63" 
+                                />
+
+                                <div className="flex items-center gap-2">
+                                    {/* TA/TP Indicators on LCD */}
+                                    <div className="flex gap-1 mr-1">
+                                        <div className={`text-[10px] px-0.5 font-mono ${trafficActive ? 'text-red-500 font-bold animate-pulse drop-shadow-[0_0_8px_red]' : 'text-cyan-900'}`}>TP</div>
+                                        <div className={`text-[10px] px-0.5 font-mono ${trafficActive ? 'text-red-500 font-bold animate-pulse drop-shadow-[0_0_8px_red]' : 'text-cyan-900'}`}>TA</div>
+                                    </div>
+
+                                    <span className="text-[10px] border border-cyan-800 px-1 rounded text-cyan-500 font-mono">RDS</span>
+                                    <div className="w-12 h-4 opacity-80">
+                                        <MusicVisualizer active={channelIndex < 4} />
+                                    </div>
                                 </div>
+                             </div>
+
+                             {/* Middle Row: Track Name (Marquee-ish) - Keep as pixel font for scrolling text */}
+                             <div className="relative z-10 overflow-hidden whitespace-nowrap my-1">
+                                <span 
+                                    className={`text-xl tracking-wider uppercase font-['VT323'] ${trafficActive ? 'text-red-500 animate-pulse font-bold drop-shadow-[0_0_8px_rgba(255,0,0,0.8)]' : 'text-yellow-300 drop-shadow-[0_0_5px_rgba(253,224,71,0.8)]'}`}
+                                >
+                                    {channelIndex === 4 
+                                        ? "SYSTEM OFF" 
+                                        : (trafficActive ? "*** LIIKENNETIEDOTE ***" : RADIO_CHANNELS[channelIndex].track)
+                                    }
+                                </span>
+                             </div>
+                             
+                             {/* Bottom Row: Channel Name - Segment Display */}
+                             <div className="relative z-10 flex items-end">
+                                 <SegmentDisplay 
+                                    text={stationDisplay} 
+                                    size={14} 
+                                    color="#ec4899" 
+                                    dimColor="#831843"
+                                 />
+                             </div>
+                        </div>
+
+                        {/* Controls Row */}
+                        <div className="flex justify-between items-center">
+                            {/* Preset Buttons */}
+                            <div className="grid grid-cols-4 gap-1 w-48">
+                                {[0, 1, 2, 3].map(idx => (
+                                    <div 
+                                        key={idx} 
+                                        onClick={() => onChannelSelect && onChannelSelect(idx)}
+                                        className={`h-6 rounded-sm flex items-center justify-center text-[10px] font-bold border-b-2 cursor-pointer transition-all active:scale-95 font-mono select-none
+                                        ${channelIndex === idx 
+                                            ? 'bg-cyan-700 text-white border-cyan-900 shadow-[inset_0_0_5px_rgba(0,0,0,0.5)]' 
+                                            : 'bg-gray-700 text-gray-300 border-gray-950 hover:bg-gray-600'
+                                        }
+                                    `}>
+                                        {idx + 1}
+                                    </div>
+                                ))}
                             </div>
-                            <div className="w-24 h-8 opacity-80">
-                                <MusicVisualizer active={true} />
+
+                            {/* Volume Knob */}
+                            <div 
+                                className="relative w-10 h-10 rounded-full bg-gradient-to-br from-gray-600 to-gray-900 shadow-lg border border-gray-950 cursor-pointer group active:scale-95"
+                                onWheel={handleWheel}
+                                onClick={onToggleRadio}
+                                title="Scroll to Volume, Click to Power"
+                            >
+                                {/* Marker Line */}
+                                <div 
+                                    className="absolute w-1 h-3 bg-white top-1 left-1/2 -translate-x-1/2 origin-[50%_16px]"
+                                    style={{ transform: `rotate(${knobRotation}deg)` }}
+                                ></div>
+                                {/* Center Cap */}
+                                <div className="absolute top-1/2 left-1/2 w-4 h-4 bg-gray-800 rounded-full -translate-x-1/2 -translate-y-1/2 border border-gray-600"></div>
                             </div>
-                         </div>
-                         <div className="relative z-10 text-[10px] text-pink-400 truncate mt-1 font-mono uppercase">
-                             {channelName}
-                         </div>
+                        </div>
                     </div>
 
-                    {/* Preset Buttons */}
-                    <div className="grid grid-cols-4 gap-2">
-                        {[0, 1, 2, 3].map(idx => (
-                            <div key={idx} className={`h-8 rounded flex items-center justify-center text-xs font-bold border-b-2 transition-all shadow-inner
-                                ${channelIndex === idx 
-                                    ? 'bg-cyan-600 text-white border-cyan-800 shadow-[inset_0_0_10px_rgba(34,211,238,0.5)]' 
-                                    : 'bg-gray-800 text-gray-400 border-gray-950'
-                                }
-                            `}>
-                                {idx + 1}
+                    {/* Cassette Deck */}
+                    <div className="bg-gray-800 h-16 border-t border-gray-950 p-2 flex items-center justify-center relative">
+                        {/* Slot */}
+                        <div className="w-full h-8 bg-black rounded border-b border-gray-700 shadow-[inset_0_2px_5px_rgba(0,0,0,0.8)] flex items-center justify-center relative overflow-hidden group">
+                            {/* Door */}
+                            <div className="w-[90%] h-[80%] bg-[#111] border border-gray-800 rounded flex items-center justify-between px-4 relative">
+                                <span className="text-[6px] text-gray-500 font-mono">AUTO REVERSE</span>
+                                
+                                {/* Cassette Branding */}
+                                <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+                                    <span className="text-[10px] text-transparent bg-clip-text bg-gradient-to-b from-gray-400 to-gray-600 font-black tracking-[0.25em] font-sans italic drop-shadow-[0_1px_0_rgba(255,255,255,0.1)]">
+                                        CASSETTE
+                                    </span>
+                                </div>
+
+                                <div className="w-12 h-1 bg-gray-900 rounded-full"></div>
                             </div>
-                        ))}
+                        </div>
                     </div>
                 </div>
 
