@@ -1,5 +1,5 @@
 {
-  "name": "Neon Horizon v2",
+  "name": "Neon Horizon v2.",
   "description": "An 80s synthwave retro arcade racer built with React and Canvas. Features a pseudo-3D engine, day/night cycles, and AI radio.",
   "requestFramePermissions": []
 }
