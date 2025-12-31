@@ -27,7 +27,8 @@ export enum SpriteType {
   SKYSCRAPER = 'SKYSCRAPER',
   SIGN_LIMIT_80 = 'SIGN_LIMIT_80', // New
   SIGN_PRIORITY = 'SIGN_PRIORITY', // New
-  TRAFFIC_LIGHT = 'TRAFFIC_LIGHT'  // New
+  TRAFFIC_LIGHT = 'TRAFFIC_LIGHT',  // New
+  SAILBOAT = 'SAILBOAT' // New Stage 1 background object
 }
 
 export interface Point {

@@ -45,14 +45,12 @@ export class Renderer {
       return `rgb(${Math.round(r)}, ${Math.round(g)}, ${Math.round(b)})`;
   }
 
-  // Helper to extract RGB numbers from "rgb(r, g, b)" string
   private parseRgbString(rgbStr: string): [number, number, number] {
       const match = rgbStr.match(/\d+/g);
       if (!match || match.length < 3) return [255, 255, 255];
       return [parseInt(match[0]), parseInt(match[1]), parseInt(match[2])];
   }
 
-  // Deterministic pseudo-random number generator based on seed
   private pseudoRandom(seed: number): number {
       return Math.abs(Math.sin(seed * 12.9898 + 78.233) * 43758.5453) % 1;
   }
@@ -85,16 +83,12 @@ export class Renderer {
       DAY: { top: [0, 120, 255], bottom: [135, 206, 235], terrain: [24, 71, 133], cloud: [255, 255, 255] },
       DUSK: { top: [34, 0, 51], bottom: [255, 69, 0], terrain: [60, 20, 20], cloud: [255, 150, 100] },
       NIGHT: { top: [0, 0, 10], bottom: [0, 10, 40], terrain: [5, 5, 15], cloud: [40, 40, 70] },
-      // Stage 5 Override colors handled in logic
       LAKESIDE: COLORS.SKY.LAKESIDE,
-      // Stage 6
       FINAL_CITY: COLORS.SKY.FINAL_CITY
   };
 
   private getEnvironmentColors(time: number, stage: number) {
-      // Force Stage 5 Aesthetics if active
       if (stage === 5) {
-          // Blend fixed Lakeside colors with a bit of time pulsing
           const t = Math.sin(Date.now() / 2000) * 0.1 + 0.5;
           return {
               top: this.formatRgb(this.SKY_COLORS.LAKESIDE.top),
@@ -106,14 +100,11 @@ export class Renderer {
       }
       
       if (stage === 6) {
-          // Start with Sunset (Dusk colors) but shift rapidly to Night if needed by TimeOfDay
-          // But base palette is custom neon
           const colors = this.SKY_COLORS.FINAL_CITY;
-          // Apply time dimming to base color
-          const dim = Math.max(0.2, 1.0 - Math.abs(time - 0.5)*2); // Simple dimming curve
+          const dim = Math.max(0.2, 1.0 - Math.abs(time - 0.5)*2); 
           return {
               top: this.formatRgb(colors.top),
-              bottom: this.formatRgb(colors.bottom), // Orange Sunset
+              bottom: this.formatRgb(colors.bottom), 
               terrain: this.formatRgb(colors.terrain),
               cloud: this.formatRgb(colors.cloud),
               lightFactor: dim
@@ -125,22 +116,22 @@ export class Renderer {
 
       const safeTime = Math.max(0, Math.min(1, time));
 
-      if (safeTime < 0.25) { // Dawn -> Day
+      if (safeTime < 0.25) { 
           t = safeTime / 0.25;
           c1 = this.SKY_COLORS.DAWN;
           c2 = this.SKY_COLORS.DAY;
           lightFactor = 0.4 + (0.6 * t);
-      } else if (safeTime < 0.6) { // Day -> Dusk
+      } else if (safeTime < 0.6) { 
           t = (safeTime - 0.25) / 0.35;
           c1 = this.SKY_COLORS.DAY;
           c2 = this.SKY_COLORS.DUSK;
           lightFactor = 1.0 - (0.3 * t);
-      } else if (safeTime < 0.75) { // Dusk -> Night
+      } else if (safeTime < 0.75) { 
           t = (safeTime - 0.6) / 0.15;
           c1 = this.SKY_COLORS.DUSK;
           c2 = this.SKY_COLORS.NIGHT;
           lightFactor = 0.7 - (0.6 * t); 
-      } else { // Night -> Dawn
+      } else { 
           t = (safeTime - 0.75) / 0.25;
           c1 = this.SKY_COLORS.NIGHT;
           c2 = this.SKY_COLORS.DAWN;
@@ -158,78 +149,49 @@ export class Renderer {
   private drawCloud(ctx: CanvasRenderingContext2D, cx: number, cy: number, scale: number, colorBase: string) {
       const w = 120 * scale;
       const h = 40 * scale;
-      
       if (w <= 0) return;
-
       const [r, g, b] = this.parseRgbString(colorBase);
-
-      // Create Gradient for cloud shading based on Time of Day color
       const grad = ctx.createLinearGradient(cx, cy - h/2, cx, cy + h/2);
-      
-      // Top is lighter/brighter
       grad.addColorStop(0, `rgba(${Math.min(255, r+50)}, ${Math.min(255, g+50)}, ${Math.min(255, b+50)}, 0.9)`);
-      // Bottom is the shadow color (the passed color)
       grad.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0.7)`);
-
       ctx.fillStyle = grad;
-      
-      // Draw overlapping ellipses
       ctx.beginPath();
-      // Center
       ctx.ellipse(cx, cy, w/2, h/2, 0, 0, Math.PI * 2);
-      // Left bump
       ctx.ellipse(cx - w*0.3, cy + h*0.2, w*0.3, h*0.4, 0, 0, Math.PI * 2);
-      // Right bump
       ctx.ellipse(cx + w*0.3, cy + h*0.2, w*0.3, h*0.4, 0, 0, Math.PI * 2);
-      // Top bump
       ctx.ellipse(cx, cy - h*0.3, w*0.4, h*0.4, 0, 0, Math.PI * 2);
-      
       ctx.fill();
   }
 
   private drawSun(ctx: CanvasRenderingContext2D, width: number, horizonY: number, skyOffset: number, time: number, stage: number) {
       if (stage !== 5 && stage !== 6 && (time > 0.7 && time < 0.9)) return; 
-
       let sunHeight = -0.2; 
       if (stage === 5 || stage === 6) {
-          sunHeight = 0.2; // Fixed sunset position
-          // In stage 6 allow it to dip lower
+          sunHeight = 0.2; 
           if (stage === 6 && time > 0.6) sunHeight = 0.2 - ((time - 0.6) * 2); 
       } else {
           if (time < 0.25) sunHeight = time / 0.25; 
           else if (time < 0.6) sunHeight = 1.0 - ((time - 0.25) / 0.35); 
           else if (time < 0.75) sunHeight = 0; 
       }
-
       const sunY = horizonY + 50 - (sunHeight * 400); 
       const sunX = (width / 2) - (skyOffset * 0.05); 
-      
       const isSunset = stage === 5 || stage === 6 || (time > 0.5 && time < 0.75);
       const r = isSunset ? 255 : 255;
-      const g = isSunset ? 50 : 255; // Redder for Stage 5/6
-      const b = isSunset ? 100 : 200; // Purpler for Stage 5/6
-
+      const g = isSunset ? 50 : 255; 
+      const b = isSunset ? 100 : 200; 
       const glow = ctx.createRadialGradient(sunX, sunY, 40, sunX, sunY, 200);
       glow.addColorStop(0, `rgba(${r}, ${g}, ${b}, 0.6)`);
       glow.addColorStop(1, `rgba(${r}, ${g}, ${b}, 0)`);
       ctx.fillStyle = glow;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, 200, 0, Math.PI*2);
-      ctx.fill();
-
-      // Sun Core with scanlines for Stage 5 & 6
+      ctx.beginPath(); ctx.arc(sunX, sunY, 200, 0, Math.PI*2); ctx.fill();
       const grad = ctx.createLinearGradient(sunX, sunY - 70, sunX, sunY + 70);
       grad.addColorStop(0, `rgb(255, 255, 200)`);
       grad.addColorStop(1, `rgb(${r}, ${g}, ${b})`);
-      
       ctx.fillStyle = grad;
-      ctx.beginPath();
-      ctx.arc(sunX, sunY, 70, 0, Math.PI*2);
-      ctx.fill();
-
-      // Retro Scanlines on sun for Stage 5 & 6
+      ctx.beginPath(); ctx.arc(sunX, sunY, 70, 0, Math.PI*2); ctx.fill();
       if (stage === 5 || stage === 6) {
-          ctx.fillStyle = 'rgba(80, 0, 100, 0.4)'; // Dark bands
+          ctx.fillStyle = 'rgba(80, 0, 100, 0.4)';
           for(let i=0; i<8; i++) {
               ctx.fillRect(sunX - 70, sunY + 10 + (i*8), 140, 4);
           }
@@ -239,24 +201,16 @@ export class Renderer {
   private drawTerrain(ctx: CanvasRenderingContext2D, width: number, height: number, horizonY: number, skyOffset: number, color: string, stage: number) {
       const terrainSpeed = 0.3; 
       const offset = skyOffset * terrainSpeed;
-      
       ctx.fillStyle = color;
       ctx.beginPath();
       ctx.moveTo(0, horizonY);
-      
       const centerX = width / 2;
-
       for (let x = 0; x <= width; x += 10) {
           const worldX = x + offset;
-          let elevation = 
-             Math.sin(worldX * 0.003) * 60 + 
-             Math.sin(worldX * 0.01) * 30 + 
-             Math.sin(worldX * 0.02) * 10;
-          
+          let elevation = Math.sin(worldX * 0.003) * 60 + Math.sin(worldX * 0.01) * 30 + Math.sin(worldX * 0.02) * 10;
           const y = horizonY - Math.abs(elevation) - 5; 
           ctx.lineTo(x, y);
       }
-      
       ctx.lineTo(width, height); 
       ctx.lineTo(0, height);
       ctx.closePath();
@@ -265,36 +219,27 @@ export class Renderer {
 
   private drawCitySilhouette(ctx: CanvasRenderingContext2D, width: number, height: number, horizonY: number, skyOffset: number) {
       const offset = skyOffset * 0.1;
-      ctx.fillStyle = '#050510'; // Dark silhouette color
-
+      ctx.fillStyle = '#050510'; 
       ctx.beginPath();
       ctx.moveTo(0, height);
       ctx.lineTo(0, horizonY);
-
       const blockWidth = 60;
       const numBlocks = Math.ceil(width / blockWidth) + 2;
-      
       for(let i=0; i<numBlocks; i++) {
            const x = (i * blockWidth) - (offset % blockWidth);
-           // Procedural height based on index + big offset to simulate scrolling
            const seed = Math.floor(offset / blockWidth) + i;
            const h = 50 + this.hash(seed) * 150; 
-           
            ctx.lineTo(x, horizonY - h);
            ctx.lineTo(x + blockWidth, horizonY - h);
       }
-      
       ctx.lineTo(width, horizonY);
       ctx.lineTo(width, height);
       ctx.fill();
-
-      // Windows
-      ctx.fillStyle = '#221133'; // Dim windows
+      ctx.fillStyle = '#221133'; 
       for(let i=0; i<numBlocks; i++) {
         const x = (i * blockWidth) - (offset % blockWidth);
         const seed = Math.floor(offset / blockWidth) + i;
         const h = 50 + this.hash(seed) * 150;
-        
         if (this.hash(seed + 10) > 0.3) {
             const wins = 4 + Math.floor(this.hash(seed+1) * 5);
             for(let w=0; w<wins; w++) {
@@ -307,104 +252,18 @@ export class Renderer {
       }
   }
 
-  private drawWater(ctx: CanvasRenderingContext2D, width: number, height: number, horizonY: number, skyTop: string, skyBottom: string) {
-      // 1. Reflection Gradient with "Sunset Chrome" aesthetic
-      const grad = ctx.createLinearGradient(0, horizonY, 0, height);
-      // Horizon - match the bottom of the sky for seamless transition
-      grad.addColorStop(0, skyBottom); 
-      // Mid - Deep purple/magenta band typical of synthwave aesthetics
-      grad.addColorStop(0.3, 'rgba(80, 20, 100, 0.95)'); 
-      // Bottom - Dark reflection of the top sky
-      grad.addColorStop(1, skyTop);
-      
-      ctx.fillStyle = grad;
-      ctx.fillRect(0, horizonY, width, height - horizonY);
-
-      // 2. Central Sun Glare Path
-      const cx = width / 2;
-      const glareGrad = ctx.createLinearGradient(0, horizonY, 0, height);
-      glareGrad.addColorStop(0, 'rgba(255, 220, 100, 0.4)'); // Yellowish glare at horizon
-      glareGrad.addColorStop(0.7, 'rgba(255, 100, 200, 0.1)'); // Fading pink
-      glareGrad.addColorStop(1, 'rgba(255, 0, 255, 0.0)'); 
-      
-      ctx.fillStyle = glareGrad;
-      ctx.beginPath();
-      // Trapezoid shape for reflection path
-      ctx.moveTo(cx - width * 0.02, horizonY);
-      ctx.lineTo(cx + width * 0.02, horizonY);
-      ctx.lineTo(cx + width * 0.25, height);
-      ctx.lineTo(cx - width * 0.25, height);
-      ctx.fill();
-
-      // 3. Procedural Dynamic Waves / Grid
-      const time = Date.now() / 1000;
-      const waveCount = 28; // Increased count for smoother gradient
-      
-      for(let i=0; i<waveCount; i++) {
-          // Calculate wave position with perspective scrolling
-          // Scroll speed: time * 0.15
-          // Loop using modulo
-          let p = (i / waveCount) + (time * 0.15 % 1);
-          if (p > 1) p -= 1; // Wrap around
-          
-          // Exponential distance distribution to cluster waves near horizon
-          // x^4 gives strong perspective effect
-          const perspectiveP = Math.pow(p, 4);
-          
-          const y = horizonY + perspectiveP * (height - horizonY);
-          
-          // Stop if off screen
-          if (y >= height) continue;
-
-          // Wave thickness increases closer to camera
-          const thickness = 1 + perspectiveP * 6;
-          
-          // Alpha logic: fade in from horizon, fade out at very bottom
-          const alpha = Math.sin(p * Math.PI) * 0.6; 
-          
-          // Base wave color - Neon Pink/Cyan mix
-          ctx.fillStyle = `rgba(255, 80, 220, ${alpha})`;
-          
-          // Draw the full width wave line
-          ctx.fillRect(0, y, width, thickness);
-
-          // Add dynamic "sparkle" or "broken" segments on top to simulate ripples
-          // Using sine waves to create moving highlights
-          const segCount = 12;
-          const segWidth = width / segCount;
-          
-          ctx.fillStyle = `rgba(200, 240, 255, ${alpha + 0.3})`; // Bright highlight
-          
-          for(let s=0; s<segCount; s++) {
-              // Create oscillating movement for highlights
-              const shift = Math.sin(time * 3 + i * 0.5 + s) * 0.5 + 0.5;
-              
-              // Only draw some segments to look like broken water surface
-              if (shift > 0.6) {
-                  const sx = s * segWidth + (shift * 20); // Minor lateral shift
-                  const sw = segWidth * 0.7; // Width of sparkle
-                  ctx.fillRect(sx, y, sw, thickness);
-              }
-          }
-      }
-  }
-
   private drawCloudLayer(ctx: CanvasRenderingContext2D, width: number, horizonY: number, skyOffset: number, speed: number, heightOffset: number, cloudColor: string, layerIndex: number) {
       const density = 400; 
       const worldWidth = 4000; 
-      
       const rawShift = skyOffset * speed;
       const shift = rawShift % worldWidth;
       const stagger = (layerIndex * 150);
-
       const count = Math.ceil((width + 400) / density) + 2;
       const startX = -200 - (shift % density);
-
       for(let i=0; i<count; i++) {
            const cx = startX + (i * density);
            const worldBlockIndex = Math.floor((rawShift + cx) / density);
            const rnd = this.hash(worldBlockIndex * 100 + layerIndex * 50);
-
            if (rnd > 0.4) {
                const cy = horizonY - heightOffset - (rnd * 100);
                const scale = 0.8 + rnd;
@@ -417,7 +276,6 @@ export class Renderer {
   private drawFireworks(ctx: CanvasRenderingContext2D, fireworks: Particle[]) {
       ctx.save();
       ctx.globalCompositeOperation = 'lighter';
-      
       for(const p of fireworks) {
           ctx.globalAlpha = p.alpha;
           ctx.fillStyle = p.color;
@@ -425,33 +283,26 @@ export class Renderer {
           ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
           ctx.fill();
       }
-      
       ctx.restore();
   }
 
   private drawBackground(ctx: CanvasRenderingContext2D, width: number, height: number, background: any, stage: number) {
     const { skyOffset, timeOfDay } = background;
     const horizonY = height / 2;
-    
     const env = this.getEnvironmentColors(timeOfDay, stage);
 
-    // 1. Sky Gradient
     const gradient = ctx.createLinearGradient(0, 0, 0, height);
     gradient.addColorStop(0, env.top); 
     gradient.addColorStop(1, env.bottom); 
-
     ctx.fillStyle = gradient;
     ctx.fillRect(0, 0, width, height);
 
-    // 2. The Sun
     this.drawSun(ctx, width, horizonY, skyOffset, timeOfDay, stage);
 
-    // 3. Clouds (Staggered layers)
     this.drawCloudLayer(ctx, width, horizonY, skyOffset, 0.05, 120, env.cloud, 0); 
     this.drawCloudLayer(ctx, width, horizonY, skyOffset, 0.10, 80, env.cloud, 1); 
     this.drawCloudLayer(ctx, width, horizonY, skyOffset, 0.20, 40, env.cloud, 2); 
 
-    // Stars at night
     if (stage === 5 || stage === 6 || timeOfDay > 0.6) {
         ctx.fillStyle = 'rgba(255, 255, 255, 0.8)';
         for(let i=0; i<80; i++) {
@@ -462,17 +313,16 @@ export class Renderer {
         }
     }
 
-    // 4. Terrain / Water / City Skyline
     if (stage === 5) {
-        this.drawWater(ctx, width, height, horizonY, env.top, env.bottom);
-    } else if (stage === 6) {
+        // Stage 5 background is special Synthwave sky/water
+        // Water horizon line already handled in render() but we need sky here
+        // The getEnvironmentColors handles the colors
+    } else if (stage === 6 || stage === 3) { // Stage 3 uses City Background too
         this.drawCitySilhouette(ctx, width, height, horizonY, skyOffset);
-        // Add a ground plane
         ctx.fillStyle = env.terrain;
         ctx.fillRect(0, horizonY, width, height - horizonY);
     } else {
         this.drawTerrain(ctx, width, height, horizonY, skyOffset, env.terrain, stage); 
-        // Ocean line
         ctx.fillStyle = env.terrain; 
         ctx.fillRect(0, horizonY, width, 40);
     }
@@ -481,113 +331,70 @@ export class Renderer {
   }
 
   private drawCheckpoint(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number) {
-      // Create a brighter, high-contrast checkpoint gate
-      
-      // Side Pillars - Chrome/Metallic
       const gradPillar = ctx.createLinearGradient(x - w/2, y - h, x - w/2 + w*0.05, y - h);
       gradPillar.addColorStop(0, '#555');
       gradPillar.addColorStop(0.5, '#fff');
       gradPillar.addColorStop(1, '#888');
-
       ctx.fillStyle = gradPillar;
-      ctx.fillRect(x - w/2, y - h, w * 0.05, h); // Left
-      ctx.fillRect(x + w/2 - w*0.05, y - h, w * 0.05, h); // Right
-
-      // Top Banner Background
+      ctx.fillRect(x - w/2, y - h, w * 0.05, h); 
+      ctx.fillRect(x + w/2 - w*0.05, y - h, w * 0.05, h); 
       const bannerH = h * 0.25;
       const bannerY = y - h + bannerH/2;
-      
       ctx.fillStyle = '#000';
       ctx.fillRect(x - w/2, y - h, w, bannerH);
-      
-      // Strobing Border
       const time = Date.now() / 100;
       const strobe = Math.sin(time) > 0 ? '#ffff00' : '#ff0000';
       ctx.strokeStyle = strobe;
       ctx.lineWidth = w * 0.015;
       ctx.strokeRect(x - w/2, y - h, w, bannerH);
-
-      // Text "CHECKPOINT"
       ctx.fillStyle = '#ff0000';
       ctx.font = `900 ${Math.ceil(bannerH * 0.8)}px Orbitron`;
       ctx.textAlign = 'center';
       ctx.textBaseline = 'middle';
-      
-      // Text Glow
       ctx.shadowColor = '#ff0000';
       ctx.shadowBlur = 20;
       ctx.fillText("CHECKPOINT", x, bannerY);
       ctx.shadowBlur = 0;
-
-      // Traffic Lights on top of pillars
       const lightColor = Math.floor(time / 2) % 2 === 0 ? '#00ff00' : '#ffff00';
       const r = bannerH * 0.3;
-      
       ctx.fillStyle = lightColor;
       ctx.shadowColor = lightColor;
       ctx.shadowBlur = 15;
-      
       ctx.beginPath(); ctx.arc(x - w * 0.45, bannerY, r, 0, Math.PI*2); ctx.fill();
       ctx.beginPath(); ctx.arc(x + w * 0.45, bannerY, r, 0, Math.PI*2); ctx.fill();
-      
       ctx.shadowBlur = 0;
   }
 
-  // New function to draw a detailed, varied NPC Car
   private drawNPCCar(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, light: number, seed: number) {
       const dim = Math.max(0.1, light);
-      
-      // Select Color based on seed
-      const colors = [
-          '#d32f2f', // Red
-          '#0288d1', // Blue
-          '#fbc02d', // Yellow
-          '#388e3c', // Green
-          '#7b1fa2', // Purple
-          '#e0e0e0', // Silver
-          '#1a1a1a'  // Black
-      ];
-      // Use the seed to pick a car type and color
+      const colors = ['#d32f2f', '#0288d1', '#fbc02d', '#388e3c', '#7b1fa2', '#e0e0e0', '#1a1a1a'];
       const rnd = this.pseudoRandom(seed * 123);
       const colorIndex = Math.floor(rnd * 100) % colors.length;
       const baseColor = colors[colorIndex];
       const mainColor = this.adjustBrightness(baseColor, dim);
       const highlightColor = this.adjustBrightness(baseColor, dim + 0.3);
       const darkColor = this.adjustBrightness(baseColor, dim - 0.2);
-
-      const isConvertible = (Math.floor(rnd * 100) % 3) === 0; // 1 in 3 chance
+      const isConvertible = (Math.floor(rnd * 100) % 3) === 0; 
       const isWide = (Math.floor(rnd * 100) % 2) === 0;
-
       const widthMod = isWide ? 1.0 : 0.9;
       const effectiveW = w * widthMod;
       const offsetX = x + (w - effectiveW) / 2;
-
-      // Shadow
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.beginPath(); 
       ctx.ellipse(x + w/2, y + h*0.9, effectiveW/1.8, h*0.15, 0, 0, Math.PI*2);
       ctx.fill();
-
-      // Tyres
       ctx.fillStyle = this.adjustBrightness('#111111', dim);
       ctx.fillRect(offsetX + effectiveW*0.05, y + h*0.75, effectiveW*0.18, h*0.25); 
       ctx.fillRect(offsetX + effectiveW*0.77, y + h*0.75, effectiveW*0.18, h*0.25); 
-
-      // Lower Body (Bumper/Skirt)
       ctx.fillStyle = darkColor;
       ctx.fillRect(offsetX + effectiveW*0.05, y + h*0.8, effectiveW*0.9, h*0.15);
-
-      // Main Body Block
       ctx.fillStyle = mainColor;
-      // Start form bottom up
       ctx.beginPath();
-      ctx.moveTo(offsetX + effectiveW*0.05, y + h*0.8); // Bottom Left
-      ctx.lineTo(offsetX + effectiveW*0.05, y + h*0.45); // Top Left (Deck height)
-      ctx.lineTo(offsetX + effectiveW*0.95, y + h*0.45); // Top Right
-      ctx.lineTo(offsetX + effectiveW*0.95, y + h*0.8); // Bottom Right
+      ctx.moveTo(offsetX + effectiveW*0.05, y + h*0.8); 
+      ctx.lineTo(offsetX + effectiveW*0.05, y + h*0.45); 
+      ctx.lineTo(offsetX + effectiveW*0.95, y + h*0.45); 
+      ctx.lineTo(offsetX + effectiveW*0.95, y + h*0.8); 
       ctx.fill();
-
-      // Side Vents (Testarossa style strakes or intakes)
       if (isWide) {
           ctx.fillStyle = this.adjustBrightness('#000000', dim);
           const ventH = h*0.03;
@@ -596,44 +403,28 @@ export class Renderer {
               ctx.fillRect(offsetX + effectiveW*0.8, y + h*0.5 + (i*ventH*2), effectiveW*0.15, ventH);
           }
       }
-
-      // Upper Deck / Trunk
       ctx.fillStyle = mainColor;
       ctx.fillRect(offsetX + effectiveW*0.1, y + h*0.35, effectiveW*0.8, h*0.2);
-
-      // Cabin / Roof / Interior
       if (isConvertible) {
-          // Open Top
-          // Interior base
-          ctx.fillStyle = this.adjustBrightness('#3e2723', dim); // Brown leatherish
+          ctx.fillStyle = this.adjustBrightness('#3e2723', dim); 
           ctx.fillRect(offsetX + effectiveW*0.2, y + h*0.25, effectiveW*0.6, h*0.2);
-          
-          // Drivers (Simple circles for NPC)
           ctx.fillStyle = '#222';
           ctx.beginPath(); ctx.arc(offsetX + effectiveW*0.35, y + h*0.2, effectiveW*0.05, 0, Math.PI*2); ctx.fill();
-
-          // Windshield frame
           ctx.fillStyle = this.adjustBrightness('#111', dim);
           ctx.fillRect(offsetX + effectiveW*0.2, y + h*0.25, effectiveW*0.6, h*0.05);
-
       } else {
-          // Hard Top Coupe
-          // Roof
           ctx.fillStyle = highlightColor;
           ctx.beginPath();
-          ctx.moveTo(offsetX + effectiveW*0.2, y + h*0.35); // Base Left
-          ctx.lineTo(offsetX + effectiveW*0.25, y + h*0.05); // Roof Left
-          ctx.lineTo(offsetX + effectiveW*0.75, y + h*0.05); // Roof Right
-          ctx.lineTo(offsetX + effectiveW*0.8, y + h*0.35); // Base Right
+          ctx.moveTo(offsetX + effectiveW*0.2, y + h*0.35); 
+          ctx.lineTo(offsetX + effectiveW*0.25, y + h*0.05); 
+          ctx.lineTo(offsetX + effectiveW*0.75, y + h*0.05); 
+          ctx.lineTo(offsetX + effectiveW*0.8, y + h*0.35); 
           ctx.fill();
-
-          // Rear Window
           const winGrad = ctx.createLinearGradient(0, y + h*0.05, 0, y + h*0.35);
           winGrad.addColorStop(0, this.adjustBrightness('#111', dim));
           winGrad.addColorStop(0.5, this.adjustBrightness('#455a64', dim));
           winGrad.addColorStop(1, this.adjustBrightness('#000', dim));
           ctx.fillStyle = winGrad;
-          
           ctx.beginPath();
           ctx.moveTo(offsetX + effectiveW*0.24, y + h*0.32);
           ctx.lineTo(offsetX + effectiveW*0.28, y + h*0.08);
@@ -641,27 +432,17 @@ export class Renderer {
           ctx.lineTo(offsetX + effectiveW*0.76, y + h*0.32);
           ctx.fill();
       }
-
-      // Rear Panel / Taillights
       const lightY = y + h * 0.45;
       const lightH = h * 0.15;
-      
-      // Black strip for lights
       ctx.fillStyle = '#000';
       ctx.fillRect(offsetX + effectiveW*0.1, lightY, effectiveW*0.8, lightH);
-
-      // Lights style based on random
       ctx.fillStyle = '#d50000';
       ctx.shadowColor = '#f44336';
       ctx.shadowBlur = (light < 0.5) ? 10 : 0;
-
       const lightStyle = Math.floor(rnd * 100) % 3;
-      
       if (lightStyle === 0) {
-          // Bar style (Cyberpunk/Robocop)
           ctx.fillRect(offsetX + effectiveW*0.15, lightY + lightH*0.2, effectiveW*0.7, lightH*0.6);
       } else if (lightStyle === 1) {
-          // Dual Round (Corvette/Ferrari)
           const r = lightH * 0.4;
           const cy = lightY + lightH/2;
           ctx.beginPath(); ctx.arc(offsetX + effectiveW*0.25, cy, r, 0, Math.PI*2); ctx.fill();
@@ -669,17 +450,12 @@ export class Renderer {
           ctx.beginPath(); ctx.arc(offsetX + effectiveW*0.65, cy, r, 0, Math.PI*2); ctx.fill();
           ctx.beginPath(); ctx.arc(offsetX + effectiveW*0.75, cy, r, 0, Math.PI*2); ctx.fill();
       } else {
-          // Rectangular blocks (DeLorean/Testarossa)
           ctx.fillRect(offsetX + effectiveW*0.12, lightY + lightH*0.1, effectiveW*0.25, lightH*0.8);
           ctx.fillRect(offsetX + effectiveW*0.63, lightY + lightH*0.1, effectiveW*0.25, lightH*0.8);
       }
       ctx.shadowBlur = 0;
-
-      // License Plate
       ctx.fillStyle = '#ffeb3b';
       ctx.fillRect(offsetX + effectiveW*0.42, lightY + lightH*0.2, effectiveW*0.16, lightH*0.6);
-      
-      // Exhausts
       ctx.fillStyle = '#222';
       const exY = y + h*0.85;
       ctx.beginPath(); ctx.arc(offsetX + effectiveW*0.2, exY, effectiveW*0.04, 0, Math.PI*2); ctx.fill();
@@ -689,15 +465,13 @@ export class Renderer {
   private drawSprite(ctx: CanvasRenderingContext2D, width: number, height: number, resolution: number, roadWidth: number, sprite: SpriteType | string, scale: number, destX: number, destY: number, clipY: number, light: number, seed: number, offset: number) {
     let worldW = 0;
     let worldH = 0;
-
     const spriteType = sprite as SpriteType;
-
-    // Dimensions in world units
     switch(spriteType) {
         case SpriteType.PALM_TREE: worldW = 1200; worldH = 1800; break;
         case SpriteType.SPRUCE: worldW = 1000; worldH = 2200; break;
         case SpriteType.PINE: worldW = 1100; worldH = 2000; break;
         case SpriteType.BILLBOARD_01: worldW = 1000; worldH = 600; break;
+        case SpriteType.BILLBOARD_02: worldW = 5000; worldH = 6000; break; // Massive Rocks for Stage 2
         case SpriteType.CAR_NPC: worldW = 700; worldH = 350; break; 
         case SpriteType.SAND_DUNE: worldW = 2500; worldH = 700; break;
         case SpriteType.CACTUS: worldW = 300; worldH = 800; break;
@@ -710,31 +484,25 @@ export class Renderer {
         case SpriteType.SIGN_LIMIT_80: worldW = 300; worldH = 600; break;
         case SpriteType.SIGN_PRIORITY: worldW = 300; worldH = 600; break;
         case SpriteType.TRAFFIC_LIGHT: worldW = 3000; worldH = 800; break;
+        case SpriteType.SAILBOAT: worldW = 2000; worldH = 1500; break; // New
         default: worldW = 200; worldH = 200;
     }
 
-    // VARIATION FOR PALMS
     if (spriteType === SpriteType.PALM_TREE) {
-        // Use seed to vary scale by +/- 20%
         const scaleVar = 1 + (this.pseudoRandom(seed * 1.1) * 0.4 - 0.2);
         worldW *= scaleVar;
         worldH *= scaleVar;
-        // Make some fatter/skinnier independently
         const widthVar = 1 + (this.pseudoRandom(seed * 2.2) * 0.4 - 0.2);
         worldW *= widthVar;
     }
 
-    // Procedural building height/color using PSEUDO-RANDOM generator (Stable)
     let buildingFloors = 3;
     let buildingColor = '#444';
     if (spriteType === SpriteType.BUILDING || spriteType === SpriteType.SKYSCRAPER || spriteType === SpriteType.HOUSE) {
         const rnd = this.pseudoRandom(Math.floor(seed)); 
-        
-        // Pick one of 3 grey shades for the base color
         const greys = ['#A0A0A0', '#808080', '#505050'];
         const colorIdx = Math.floor(rnd * 100) % 3;
         buildingColor = greys[colorIdx];
-
         if (spriteType === SpriteType.HOUSE) {
             buildingFloors = 1;
             worldH = 1000;
@@ -751,17 +519,10 @@ export class Renderer {
 
     const w = worldW * scale * (width / 2);
     const h = worldH * scale * (width / 2);
-
     const x = destX - (w / 2);
     const y = destY - h;
 
     if (w < 2 || h < 2) return; 
-
-    // FIX: Flying object prevention. 
-    // If the visual bottom (destY) is clearly above the clip line (clipY), don't draw.
-    // However, for traffic lights hanging over road, this check might fail if they are high up?
-    // No, destY is the 'base' of the sprite on the ground. Traffic lights have a base on the ground too (poles).
-    // But my TRAFFIC_LIGHT logic puts it at center offset... it needs a pole.
     if (spriteType !== SpriteType.TRAFFIC_LIGHT && destY < clipY) return;
 
     const clipHeight = clipY ? Math.max(0, (y + h) - clipY) : 0;
@@ -775,8 +536,6 @@ export class Renderer {
         ctx.clip();
     }
 
-    // --- SPRITE DRAWING ---
-
     if (spriteType === SpriteType.CHECKPOINT) {
         this.drawCheckpoint(ctx, destX, destY, w, h);
     } 
@@ -784,13 +543,11 @@ export class Renderer {
         this.drawNPCCar(ctx, x, y, w, h, light, seed);
     } 
     else if (spriteType === SpriteType.PALM_TREE) {
-        // ... (Existing Palm Logic)
         const trunk = this.adjustBrightness('#8B5A2B', light);
         const leaf = this.adjustBrightness('#009900', light);
         const stroke = this.adjustBrightness('#005500', light);
         ctx.fillStyle = trunk; 
         ctx.beginPath();
-        // Dynamic Curve based on seed
         const curveDir = this.pseudoRandom(seed * 3) > 0.5 ? 1 : -1;
         ctx.moveTo(x + w*0.42, y + h); 
         ctx.quadraticCurveTo(x + w*(0.5 + 0.1*curveDir), y + h*0.5, x + w*(0.48 + 0.1*curveDir), y + h*0.2);
@@ -815,19 +572,74 @@ export class Renderer {
             ctx.stroke();
         }
     } 
+    else if (spriteType === SpriteType.BILLBOARD_02) {
+        // Massive ROCKS for Stage 2 - Updated for texture and flatness
+        // Gradient fill for rock texture
+        const rockColor = this.adjustBrightness('#8b5a2b', light);
+        const rockColorDark = this.adjustBrightness('#5d4037', light);
+        
+        const grad = ctx.createLinearGradient(x, y, x, y + h);
+        grad.addColorStop(0, this.adjustBrightness('#a17d5a', light)); // Lighter top
+        grad.addColorStop(0.3, rockColor);
+        grad.addColorStop(1, rockColorDark); // Dark base
+
+        ctx.fillStyle = grad;
+        ctx.beginPath();
+        // Flat top mesa/butte shape
+        ctx.moveTo(x, y + h); // Bottom Left
+        ctx.lineTo(x + w*0.1, y + h*0.3); // Left slope
+        ctx.lineTo(x + w*0.2, y + h*0.1); // Top Left edge
+        // Jagged flat top
+        ctx.lineTo(x + w*0.4, y + h*0.12);
+        ctx.lineTo(x + w*0.6, y + h*0.08);
+        ctx.lineTo(x + w*0.8, y + h*0.1); // Top Right edge
+        ctx.lineTo(x + w*0.9, y + h*0.3); // Right slope
+        ctx.lineTo(x + w, y + h); // Bottom Right
+        ctx.fill();
+        
+        // Horizontal Sediment Layers
+        ctx.fillStyle = this.adjustBrightness('#4e342e', light * 0.8);
+        for(let i=0; i<5; i++) {
+            const ly = y + h*0.3 + (i * h * 0.12);
+            // Draw rough lines
+            ctx.fillRect(x + w*0.15, ly, w*0.7, h*0.02);
+        }
+    }
+    else if (spriteType === SpriteType.SAILBOAT) {
+        // Hull
+        ctx.fillStyle = this.adjustBrightness('#ffffff', light);
+        ctx.beginPath();
+        ctx.moveTo(x + w*0.2, y + h);
+        ctx.lineTo(x + w*0.8, y + h);
+        ctx.lineTo(x + w*0.9, y + h*0.9);
+        ctx.lineTo(x + w*0.1, y + h*0.9);
+        ctx.fill();
+        // Mast
+        ctx.fillStyle = '#333';
+        ctx.fillRect(x + w*0.48, y + h*0.3, w*0.04, h*0.6);
+        // Sails
+        ctx.fillStyle = '#eee';
+        ctx.beginPath(); // Main sail
+        ctx.moveTo(x + w*0.5, y + h*0.35);
+        ctx.lineTo(x + w*0.5, y + h*0.85);
+        ctx.lineTo(x + w*0.8, y + h*0.85);
+        ctx.fill();
+        ctx.beginPath(); // Front sail
+        ctx.moveTo(x + w*0.48, y + h*0.38);
+        ctx.lineTo(x + w*0.48, y + h*0.85);
+        ctx.lineTo(x + w*0.2, y + h*0.85);
+        ctx.fill();
+    }
     else if (spriteType === SpriteType.BUSH) {
         const green = this.adjustBrightness('#228b22', light);
         ctx.fillStyle = green;
-        // Simple cluster of circles
         ctx.beginPath(); ctx.arc(x + w*0.2, y + h*0.7, w*0.3, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(x + w*0.5, y + h*0.6, w*0.4, 0, Math.PI*2); ctx.fill();
         ctx.beginPath(); ctx.arc(x + w*0.8, y + h*0.7, w*0.3, 0, Math.PI*2); ctx.fill();
     }
     else if (spriteType === SpriteType.SIGN_LIMIT_80) {
-        // Pole
         ctx.fillStyle = '#555';
         ctx.fillRect(x + w*0.45, y + h*0.3, w*0.1, h*0.7);
-        // Circle
         ctx.fillStyle = '#fff';
         ctx.strokeStyle = '#d00';
         ctx.lineWidth = w * 0.05;
@@ -835,7 +647,6 @@ export class Renderer {
         ctx.arc(x + w*0.5, y + h*0.3, w*0.3, 0, Math.PI*2);
         ctx.fill();
         ctx.stroke();
-        // Text
         ctx.fillStyle = '#000';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
@@ -843,58 +654,42 @@ export class Renderer {
         ctx.fillText("80", x + w*0.5, y + h*0.3);
     }
     else if (spriteType === SpriteType.SIGN_PRIORITY) {
-        // Pole
         ctx.fillStyle = '#555';
         ctx.fillRect(x + w*0.45, y + h*0.3, w*0.1, h*0.7);
-        // Diamond (Yellow with white border)
         ctx.fillStyle = '#fb0';
         ctx.strokeStyle = '#fff';
         ctx.lineWidth = w * 0.03;
         ctx.beginPath();
-        ctx.moveTo(x + w*0.5, y); // Top
-        ctx.lineTo(x + w*0.8, y + h*0.3); // Right
-        ctx.lineTo(x + w*0.5, y + h*0.6); // Bottom
-        ctx.lineTo(x + w*0.2, y + h*0.3); // Left
+        ctx.moveTo(x + w*0.5, y); 
+        ctx.lineTo(x + w*0.8, y + h*0.3); 
+        ctx.lineTo(x + w*0.5, y + h*0.6); 
+        ctx.lineTo(x + w*0.2, y + h*0.3); 
         ctx.closePath();
         ctx.fill();
         ctx.stroke();
-        // Inner Black diamond outline? Or plain yellow for "Priority Road"? 
-        // Standard Priority road is Yellow Diamond with White Border.
     }
     else if (spriteType === SpriteType.TRAFFIC_LIGHT) {
-        // Gantry spanning road
-        // x is roughly center of road if offset=0
         const poleW = w * 0.05;
-        // Left Pole
         ctx.fillStyle = '#333';
         ctx.fillRect(x + w*0.1, y, poleW, h);
-        // Right Pole
         ctx.fillRect(x + w*0.9, y, poleW, h);
-        // Crossbar
         ctx.fillRect(x + w*0.1, y + h*0.1, w*0.8, h*0.1);
-        
-        // Lights (3 sets)
         const lightBoxW = w * 0.08;
         const lightBoxH = h * 0.25;
         const drawLight = (lx: number) => {
             ctx.fillStyle = '#111';
             ctx.fillRect(lx, y + h*0.15, lightBoxW, lightBoxH);
-            // Colors
             const radius = lightBoxW * 0.3;
             const cx = lx + lightBoxW/2;
             const time = Date.now() / 1000;
-            const state = Math.floor(time) % 2; // Flip flop green/red just for visuals
-            
-            ctx.fillStyle = state === 0 ? '#500' : '#f00'; // Red
+            const state = Math.floor(time) % 2; 
+            ctx.fillStyle = state === 0 ? '#500' : '#f00'; 
             ctx.beginPath(); ctx.arc(cx, y + h*0.15 + lightBoxH*0.2, radius, 0, Math.PI*2); ctx.fill();
-            
-            ctx.fillStyle = '#550'; // Yellow (off)
+            ctx.fillStyle = '#550'; 
             ctx.beginPath(); ctx.arc(cx, y + h*0.15 + lightBoxH*0.5, radius, 0, Math.PI*2); ctx.fill();
-            
-            ctx.fillStyle = state === 1 ? '#030' : '#0f0'; // Green
+            ctx.fillStyle = state === 1 ? '#030' : '#0f0'; 
             ctx.beginPath(); ctx.arc(cx, y + h*0.15 + lightBoxH*0.8, radius, 0, Math.PI*2); ctx.fill();
         };
-        
         drawLight(x + w*0.3);
         drawLight(x + w*0.5);
         drawLight(x + w*0.7);
@@ -925,7 +720,7 @@ export class Renderer {
     }
     else if (spriteType === SpriteType.STREETLIGHT) {
         ctx.fillStyle = this.adjustBrightness('#555', light);
-        ctx.fillRect(x + w*0.45, y, w*0.1, h); // Pole
+        ctx.fillRect(x + w*0.45, y, w*0.1, h); 
         ctx.beginPath();
         ctx.moveTo(x + w*0.5, y + h*0.1);
         const armEndX = offset < 0 ? x + w : x;
@@ -943,22 +738,16 @@ export class Renderer {
     else if (spriteType === SpriteType.BUILDING || spriteType === SpriteType.SKYSCRAPER || spriteType === SpriteType.HOUSE) {
         const dimColor = this.adjustBrightness(buildingColor, light);
         ctx.fillStyle = dimColor;
-        
-        // FIX: Removed infinite foundation to prevent covering road
-        // Draw modest foundation for hills, but keep it tight
         ctx.fillRect(x, y + h - 1, w, 20); 
 
         if (spriteType === SpriteType.HOUSE) {
-            // Simple House shape with gable roof
             ctx.beginPath();
             ctx.moveTo(x, y + h*0.4);
-            ctx.lineTo(x + w/2, y); // Roof peak
+            ctx.lineTo(x + w/2, y); 
             ctx.lineTo(x + w, y + h*0.4);
             ctx.lineTo(x + w, y + h);
             ctx.lineTo(x, y + h);
             ctx.fill();
-            
-            // Roof darker
             ctx.fillStyle = this.adjustBrightness('#332222', light);
             ctx.beginPath();
             ctx.moveTo(x - w*0.1, y + h*0.4);
@@ -969,13 +758,9 @@ export class Renderer {
             ctx.lineTo(x, y + h*0.4);
             ctx.fill();
         } else {
-            // Box
             ctx.fillRect(x, y, w, h);
         }
-        
-        // Windows
         const isNight = light < 0.3;
-        
         if (spriteType === SpriteType.HOUSE) {
              ctx.fillStyle = isNight ? '#ffaa00' : '#222';
              if(isNight) { ctx.shadowColor = '#ffaa00'; ctx.shadowBlur = 5; }
@@ -983,25 +768,20 @@ export class Renderer {
              ctx.fillRect(x + w*0.6, y + h*0.5, w*0.2, h*0.2);
              ctx.shadowBlur = 0;
         } else {
-            // Skyscraper/Building windows
             const floors = buildingFloors; 
             const winW = w * 0.15;
             const winH = h * 0.08;
-            
             for(let f=0; f<floors; f++) {
                 const fy = y + h - (h*0.15) - ((f+1) * (h/floors/1.2));
                 for(let wx=0; wx<3; wx++) {
                     const wxPos = x + w*0.15 + (wx * w*0.25);
                     const winRnd = this.pseudoRandom(seed * 100 + f * 10 + wx);
-                    // More lit windows in skyscrapers
                     const isLit = isNight && (winRnd > (spriteType === SpriteType.SKYSCRAPER ? 0.2 : 0.4));
-                    
                     ctx.fillStyle = isLit ? (spriteType === SpriteType.SKYSCRAPER ? '#aaccff' : '#ffeb3b') : '#111';
                     if(isLit) {
                         ctx.shadowColor = ctx.fillStyle;
                         ctx.shadowBlur = 5;
                     }
-                    
                     ctx.fillRect(wxPos, fy, winW, winH);
                     ctx.shadowBlur = 0;
                 }
@@ -1027,7 +807,6 @@ export class Renderer {
         ctx.fill();
     } 
     else {
-        // Billboard
         const board = this.adjustBrightness('#ffeb3b', Math.max(light, 0.5));
         ctx.fillStyle = board;
         ctx.fillRect(x + w*0.1, y, w*0.8, h*0.8);
@@ -1040,372 +819,317 @@ export class Renderer {
     ctx.restore();
   }
 
-  // UPDATED HEAD DRAWING WITH WIND PHYSICS
-  private drawHead(ctx: CanvasRenderingContext2D, x: number, y: number, hairColor: string, isDriver: boolean, speedPercent: number) {
-      // Wind calculation based on speed
-      const windForce = speedPercent * 15; 
-      const windFlutter = Math.sin(Date.now() / 50) * 3 * speedPercent;
-
-      // Neck
-      ctx.fillStyle = '#dca'; 
-      ctx.fillRect(x - 6, y, 12, 10);
-
-      // Face Base
-      ctx.beginPath(); ctx.arc(x, y, 12, 0, Math.PI*2); ctx.fill();
+  private drawPlayerCar(ctx: CanvasRenderingContext2D, width: number, height: number, resolution: number, roadWidth: number, speedPercent: number, curve: number, ambientLight: number, braking: boolean) {
+      const destX = width / 2;
+      const destY = height;
+      const bounce = (Math.random() * speedPercent * 4) * ((Math.random() > 0.5) ? 1 : -1);
+      const scale = resolution * 0.8; 
       
-      // Sunglasses for driver
-      if (isDriver) {
-          ctx.fillStyle = '#111';
-          ctx.fillRect(x - 10, y - 4, 20, 6);
+      const carW = 380 * scale; 
+      const carH = 150 * scale;
+      const carX = destX - (carW / 2);
+      const carY = destY - carH + bounce;
+
+      // HEADLIGHTS (If Night/Dusk)
+      if (ambientLight < 0.5) {
+           ctx.save();
+           ctx.globalCompositeOperation = 'screen';
+           const beamWidthStart = carW * 0.2;
+           const beamWidthEnd = carW * 1.5;
+           const beamH = height * 0.5; 
+           
+           const drawBeam = (bx: number) => {
+               const grad = ctx.createLinearGradient(bx, carY + carH*0.6, bx, carY - beamH);
+               grad.addColorStop(0, 'rgba(255, 255, 200, 0.6)');
+               grad.addColorStop(1, 'rgba(255, 255, 200, 0)');
+               
+               ctx.fillStyle = grad;
+               ctx.beginPath();
+               ctx.moveTo(bx - beamWidthStart/2, carY + carH*0.6);
+               ctx.lineTo(bx + beamWidthStart/2, carY + carH*0.6);
+               ctx.lineTo(bx + beamWidthEnd, carY - beamH);
+               ctx.lineTo(bx - beamWidthEnd, carY - beamH);
+               ctx.fill();
+           };
+           drawBeam(carX + carW*0.2);
+           drawBeam(carX + carW*0.8);
+           ctx.restore();
       }
-
-      // Hair
-      ctx.fillStyle = hairColor;
-      ctx.beginPath();
-      if (isDriver) {
-          // Short hair, slight ruffle
-          ctx.moveTo(x - 14, y);
-          ctx.quadraticCurveTo(x - 5, y - 18 + windFlutter * 0.5, x + 14, y); // Top arch
-          ctx.lineTo(x + 12, y + 5);
-          ctx.lineTo(x - 12, y + 5);
-      } else {
-          // Long Passenger Hair - FLOWING BACK
-          // Anchor at forehead
-          ctx.moveTo(x - 12, y - 5);
-          // Top curve blowing back
-          ctx.bezierCurveTo(
-              x - 5, y - 25, // Control point up
-              x + 10, y - 20, // Control point back
-              x + 25 + windForce, y - 10 + windFlutter // Tip trailing back
-          );
-          // Bottom curve blowing back
-          ctx.bezierCurveTo(
-              x + 15, y + 10, 
-              x + 5, y + 15, 
-              x - 12, y + 5  // Back to ear
-          );
-      }
-      ctx.fill();
-  }
-
-  private drawPlayerCar(ctx: CanvasRenderingContext2D, width: number, height: number, resolution: number, roadWidth: number, speedPercent: number, turn: number, light: number, braking: boolean) {
-      const w = 320 * resolution; // Widened player car
-      const h = 100 * resolution;
-      
-      // Compute positions including bounce/lean here for sync
-      const bounce = Math.sin(Date.now() / 100) * speedPercent * 1.5 * resolution;
-      const leanX = turn * 10 * resolution;
-      
-      const centerX = width / 2;
-      const carX = centerX + leanX;
-      // FIX: Subtract h to position top of car correctly
-      const carY = (height - 15) - h - bounce;
-
-      // HEADLIGHTS BEAMS (Night/Dusk)
-      if (light < 0.7) { 
-          const horizonY = height / 2;
-          const beamTargetY = horizonY + 10; 
-          // FIX: Emission point relative to car top
-          const lightY = carY + h * 0.65; 
-          const leftLightX = carX - w * 0.38;
-          const rightLightX = carX + w * 0.38;
-
-          const intensity = (1.0 - light) * 0.6;
-
-          ctx.save();
-          ctx.globalCompositeOperation = 'screen'; 
-          
-          // Beam Gradient
-          const grad = ctx.createLinearGradient(0, lightY, 0, beamTargetY);
-          grad.addColorStop(0, `rgba(255, 255, 200, ${intensity})`); 
-          grad.addColorStop(0.8, `rgba(255, 255, 200, ${intensity * 0.2})`); 
-          grad.addColorStop(1, `rgba(255, 255, 200, 0)`);
-          
-          ctx.fillStyle = grad;
-
-          // Left Beam
-          ctx.beginPath();
-          ctx.moveTo(leftLightX, lightY); 
-          ctx.lineTo(centerX - w * 1.8, beamTargetY); 
-          ctx.lineTo(centerX + w * 0.5, beamTargetY); 
-          ctx.fill();
-
-          // Right Beam
-          ctx.beginPath();
-          ctx.moveTo(rightLightX, lightY);
-          ctx.lineTo(centerX - w * 0.5, beamTargetY); 
-          ctx.lineTo(centerX + w * 1.8, beamTargetY); 
-          ctx.fill();
-
-          ctx.restore();
-      }
-
-      ctx.save();
-      
-      ctx.translate(carX, carY + h); // Anchor at bottom-center
-      ctx.translate(-(w/2), -h); // Move back to top-left of sprite relative to anchor
 
       // Shadow
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
-      ctx.beginPath(); ctx.ellipse(w/2, h - 5, w/2, 10, 0, 0, Math.PI * 2); ctx.fill();
-
-      const dim = Math.max(0.1, light);
-
-      // Colors
-      const ferrariRed = this.adjustBrightness('#d32f2f', dim);
-      const ferrariDark = this.adjustBrightness('#8e0000', dim);
-      const ferrariHighlight = this.adjustBrightness('#ff6659', dim);
-      
-      // 0. SIDE MIRRORS (Revised: Symmetrical Beltline Mount)
-      ctx.fillStyle = ferrariRed;
-      
-      // Left Mirror
       ctx.beginPath();
-      ctx.moveTo(w*0.15, h*0.48); // Body attachment
-      ctx.lineTo(w*0.05, h*0.48); // Arm
-      ctx.lineTo(w*0.05, h*0.55); // Mirror bottom inner
-      ctx.lineTo(-w*0.05, h*0.55); // Mirror bottom outer
-      ctx.lineTo(-w*0.05, h*0.40); // Mirror top outer
-      ctx.lineTo(w*0.05, h*0.40); // Mirror top inner
-      ctx.fill();
-      
-      // Glass Left
-      ctx.fillStyle = '#112233';
-      ctx.fillRect(-w*0.04, h*0.41, w*0.08, h*0.13);
-
-      // Right Mirror
-      ctx.fillStyle = ferrariRed;
-      ctx.beginPath();
-      ctx.moveTo(w*0.85, h*0.48); 
-      ctx.lineTo(w*0.95, h*0.48); 
-      ctx.lineTo(w*0.95, h*0.55); 
-      ctx.lineTo(w*1.05, h*0.55); 
-      ctx.lineTo(w*1.05, h*0.40); 
-      ctx.lineTo(w*0.95, h*0.40); 
+      ctx.ellipse(destX, destY - carH*0.1, carW * 0.45, carH * 0.15, 0, 0, Math.PI * 2);
       ctx.fill();
 
-      // Glass Right
-      ctx.fillStyle = '#112233';
-      ctx.fillRect(w*0.96, h*0.41, w*0.08, h*0.13);
-
-      // 1. TYRES (Wider, more detail)
-      ctx.fillStyle = this.adjustBrightness('#151515', dim);
-      const tireW = w * 0.22;
-      const tireH = h * 0.25;
-      const tireY = h - tireH;
-      ctx.fillRect(10, tireY, tireW, tireH); // Left
-      ctx.fillRect(w - 10 - tireW, tireY, tireW, tireH); // Right
+      // --- TIRES (Wide Rears) ---
+      const tireW = carW * 0.22;
+      const tireH = carH * 0.25;
+      const tireColor = this.adjustBrightness('#111111', ambientLight);
       
-      // Tread detail
-      ctx.fillStyle = '#000';
-      for(let i=0; i<3; i++) {
-        ctx.fillRect(10 + i*(tireW/3), tireY, 2, tireH);
-        ctx.fillRect(w - 10 - tireW + i*(tireW/3), tireY, 2, tireH);
-      }
-
-      // 2. MAIN BODY (Lower Chassis & Fenders)
-      ctx.fillStyle = ferrariRed;
+      ctx.fillStyle = tireColor;
+      ctx.fillRect(carX + carW*0.08, carY + carH*0.7, tireW, tireH); // Left
+      ctx.fillRect(carX + carW*0.70, carY + carH*0.7, tireW, tireH); // Right
       
-      // Wide rear fenders (Testarossa hips)
-      ctx.beginPath();
-      ctx.moveTo(0, h * 0.55); // Top outer left fender
-      ctx.lineTo(0, h - 10); // Bottom outer left
-      ctx.lineTo(w, h - 10); // Bottom outer right
-      ctx.lineTo(w, h * 0.55); // Top outer right
-      ctx.lineTo(w * 0.85, h * 0.45); // Top inner right (waistline)
-      ctx.lineTo(w * 0.15, h * 0.45); // Top inner left
-      ctx.fill();
+      // Tire Detail (Rim center)
+      ctx.fillStyle = '#333';
+      ctx.beginPath(); ctx.arc(carX + carW*0.19, carY + carH*0.82, tireW*0.3, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(carX + carW*0.81, carY + carH*0.82, tireW*0.3, 0, Math.PI*2); ctx.fill();
 
-      // 3. SIDE INTAKES (The "Cheese Grater")
-      ctx.fillStyle = ferrariDark;
-      const strakeCount = 5;
-      const strakeH = h * 0.04;
-      const strakeGap = h * 0.04;
-      const strakeStartY = h * 0.55;
-      
-      // Left Side Strakes
-      for(let i=0; i<strakeCount; i++) {
-          const yPos = strakeStartY + (i * (strakeH + strakeGap));
-          ctx.beginPath();
-          ctx.moveTo(0, yPos);
-          ctx.lineTo(w * 0.14, yPos + 2); 
-          ctx.lineTo(w * 0.14, yPos + 2 + strakeH);
-          ctx.lineTo(0, yPos + strakeH);
-          ctx.fill();
-      }
+      // --- BODY COLORS ---
+      const red = this.adjustBrightness('#e00000', ambientLight); // Ferrari Red
+      const darkRed = this.adjustBrightness('#800000', ambientLight);
+      const interior = this.adjustBrightness('#d2b48c', ambientLight); // Tan
 
-      // Right Side Strakes
-      for(let i=0; i<strakeCount; i++) {
-          const yPos = strakeStartY + (i * (strakeH + strakeGap));
-          ctx.beginPath();
-          ctx.moveTo(w, yPos);
-          ctx.lineTo(w - (w * 0.14), yPos + 2);
-          ctx.lineTo(w - (w * 0.14), yPos + 2 + strakeH);
-          ctx.lineTo(w, yPos + strakeH);
-          ctx.fill();
-      }
-
-      // 4. BUMPER / UNDERCARRIAGE
-      ctx.fillStyle = this.adjustBrightness('#111', dim);
-      ctx.fillRect(w * 0.1, h * 0.85, w * 0.8, h * 0.15); // Lower valence
-      
-      // 5. EXHAUSTS (Quad pipes)
-      ctx.fillStyle = '#222';
-      ctx.strokeStyle = '#666';
-      ctx.lineWidth = 2;
-      
-      const drawExhaust = (x: number) => {
-          ctx.beginPath(); ctx.arc(x, h - 6, 6, 0, Math.PI*2); ctx.fill(); ctx.stroke();
-      };
-      drawExhaust(w * 0.25); drawExhaust(w * 0.32); // Left Pair
-      drawExhaust(w * 0.75); drawExhaust(w * 0.68); // Right Pair
-
-      // 6. DYNAMIC FLAMES
-      if (speedPercent > 0.8) {
-          const flicker = Math.random();
-          // Always draw if very fast, else random
-          if (speedPercent > 0.95 || flicker > 0.6) {
-              const flameLen = (speedPercent - 0.7) * (h * 0.8) * (0.8 + Math.random() * 0.4);
-              const flameW = (w * 0.04) * Math.random();
-              
-              const drawFlame = (x: number) => {
-                 ctx.beginPath();
-                 const grad = ctx.createLinearGradient(x, h-6, x, h-6+flameLen);
-                 grad.addColorStop(0, 'rgba(255, 255, 255, 0.8)'); // Core
-                 grad.addColorStop(0.2, 'rgba(255, 255, 0, 0.6)'); // Yellow
-                 grad.addColorStop(0.6, 'rgba(255, 80, 0, 0.4)'); // Orange
-                 grad.addColorStop(1, 'rgba(255, 0, 0, 0)'); // Red tip
-                 ctx.fillStyle = grad;
-                 
-                 ctx.moveTo(x - flameW, h - 6);
-                 ctx.quadraticCurveTo(x, h - 6 + flameLen, x + flameW, h - 6);
-                 ctx.fill();
-              };
-              
-              // Randomly pick left or right pair source
-              drawFlame(w * 0.285); 
-              drawFlame(w * 0.715); 
-          }
-      }
-
-      // 7. ENGINE DECK (Rear slope)
-      const deckGrad = ctx.createLinearGradient(0, h*0.4, 0, h*0.7);
-      deckGrad.addColorStop(0, ferrariRed);
-      deckGrad.addColorStop(1, ferrariDark);
-      ctx.fillStyle = deckGrad;
-      
-      ctx.beginPath();
-      ctx.moveTo(w * 0.15, h * 0.45);
-      ctx.lineTo(w * 0.25, h * 0.38); 
-      ctx.lineTo(w * 0.75, h * 0.38); 
-      ctx.lineTo(w * 0.85, h * 0.45);
-      ctx.fill();
-
-      // Engine Vents on Deck
-      ctx.fillStyle = 'rgba(0,0,0,0.3)';
-      for(let i=0; i<6; i++) {
-         ctx.fillRect(w*0.3 + (i * w*0.08), h*0.4, w*0.02, h*0.05); 
-      }
-
-      // 8. CABIN STRUCTURE (PILLARS) - SEPARATED FROM ROOF TO ALLOW TRANSPARENT WINDOW
-      ctx.fillStyle = ferrariRed;
-      
-      // Left C-Pillar
-      ctx.beginPath();
-      ctx.moveTo(w * 0.22, h * 0.40); // Base Outer
-      ctx.lineTo(w * 0.28, 5);        // Top Outer
-      ctx.lineTo(w * 0.34, 5);        // Top Inner
-      ctx.lineTo(w * 0.30, h * 0.38); // Base Inner (approx)
-      ctx.fill();
-
-      // Right C-Pillar
-      ctx.beginPath();
-      ctx.moveTo(w * 0.78, h * 0.40); // Base Outer
-      ctx.lineTo(w * 0.72, 5);        // Top Outer
-      ctx.lineTo(w * 0.66, 5);        // Top Inner
-      ctx.lineTo(w * 0.70, h * 0.38); // Base Inner (approx)
-      ctx.fill();
-
-      // Roof Bar
-      ctx.beginPath();
-      ctx.moveTo(w * 0.28, 5);
-      ctx.lineTo(w * 0.72, 5);
-      ctx.lineTo(w * 0.72, 9);
-      ctx.lineTo(w * 0.28, 9);
-      ctx.fill();
-      
-      // Highlight on roof edge
-      ctx.fillStyle = 'rgba(255,255,255,0.3)';
-      ctx.fillRect(w*0.32, 6, w*0.36, 2);
-
-      // 9. REAR WINDOW (Transparent Glass)
-      // Since we didn't fill the cabin area with red, this transparent gradient will show the road behind!
-      const winGrad = ctx.createLinearGradient(w*0.3, 10, w*0.7, h*0.38);
-      // Use RGBA for transparency
-      winGrad.addColorStop(0, `rgba(0, 0, 0, 0.2)`);
-      winGrad.addColorStop(0.5, `rgba(20, 30, 50, 0.3)`);
-      winGrad.addColorStop(1, `rgba(0, 0, 0, 0.4)`);
-      
-      ctx.fillStyle = winGrad;
-      ctx.beginPath();
-      ctx.moveTo(w * 0.30, h * 0.38); // Base Left
-      ctx.lineTo(w * 0.34, 9);        // Top Left
-      ctx.lineTo(w * 0.66, 9);        // Top Right
-      ctx.lineTo(w * 0.70, h * 0.38); // Base Right
-      ctx.fill();
-      
-      // Diagonal Glare on Window (Subtle reflection)
-      ctx.fillStyle = 'rgba(255,255,255,0.25)';
-      ctx.beginPath();
-      ctx.moveTo(w*0.6, 9);
-      ctx.lineTo(w*0.65, 9);
-      ctx.lineTo(w*0.45, h*0.38);
-      ctx.lineTo(w*0.4, h*0.38);
-      ctx.fill();
-
-      // 10. REAR FASCIA (The Black Grille & TAILLIGHTS)
-      const grillY = h * 0.50;
-      const grillH = h * 0.22;
-      
-      // Black background
-      ctx.fillStyle = '#050505';
-      ctx.fillRect(w * 0.15, grillY, w * 0.7, grillH);
-
-      // Taillights Logic: If braking, bright red + glow, else dark red + no glow
-      const lightColor = braking ? '#ff0000' : '#cc0000';
-      const lightShadow = braking ? 20 : 0;
-      
-      ctx.fillStyle = lightColor;
-      ctx.shadowColor = '#ff0000';
-      ctx.shadowBlur = lightShadow;
-      
-      // Left Cluster
-      ctx.fillRect(w * 0.18, grillY + 4, w * 0.25, grillH - 8);
-      // Right Cluster
-      ctx.fillRect(w * 0.57, grillY + 4, w * 0.25, grillH - 8);
-      
-      ctx.shadowBlur = 0; // Reset shadow
-
-      // The Slats (Draw over the lights to create the iconic "slotted" look)
+      // --- REAR BUMPER ---
       ctx.fillStyle = '#111';
-      for(let i=0; i<4; i++) {
-          ctx.fillRect(w * 0.15, grillY + (i* (grillH/4.5)) + 2, w * 0.7, grillH/8);
-      }
+      ctx.fillRect(carX + carW*0.05, carY + carH*0.85, carW*0.9, carH*0.15);
       
-      // Prancing Horse Badge (Silver)
-      ctx.fillStyle = '#silver';
-      ctx.beginPath(); ctx.arc(w/2, grillY + grillH/2, 2, 0, Math.PI*2); ctx.fill();
+      // Exhausts (Quad tips)
+      ctx.fillStyle = '#555';
+      const exY = carY + carH*0.9;
+      ctx.beginPath(); ctx.arc(carX + carW*0.15, exY, carW*0.03, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(carX + carW*0.22, exY, carW*0.03, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(carX + carW*0.78, exY, carW*0.03, 0, Math.PI*2); ctx.fill();
+      ctx.beginPath(); ctx.arc(carX + carW*0.85, exY, carW*0.03, 0, Math.PI*2); ctx.fill();
+      
+      // --- MAIN BODY (Wedge Lower Block) ---
+      const bodyGrad = ctx.createLinearGradient(carX, carY, carX + carW, carY);
+      bodyGrad.addColorStop(0, darkRed);
+      bodyGrad.addColorStop(0.2, red);
+      bodyGrad.addColorStop(0.8, red);
+      bodyGrad.addColorStop(1, darkRed);
+      
+      ctx.fillStyle = bodyGrad;
+      // Lower block
+      ctx.fillRect(carX, carY + carH*0.45, carW, carH*0.4);
+      
+      // Rear Deck / Engine Cover (Tapers in)
+      ctx.beginPath();
+      ctx.moveTo(carX, carY + carH*0.45);
+      ctx.lineTo(carX + carW*0.15, carY + carH*0.15); // Deck Top Left
+      ctx.lineTo(carX + carW*0.85, carY + carH*0.15); // Deck Top Right
+      ctx.lineTo(carX + carW, carY + carH*0.45);
+      ctx.fill();
 
-      // 11. HEADS (NEW ANIMATED HAIR) & REARVIEW MIRROR
-      this.drawHead(ctx, w * 0.35, h * 0.32, '#2e1c1c', true, speedPercent); // Driver (Dark Hair)
-      this.drawHead(ctx, w * 0.65, h * 0.32, '#ffecb3', false, speedPercent); // Passenger (Blonde)
-
-      // REARVIEW MIRROR (NEW)
-      // Small dark rectangle hanging from roof center
-      ctx.fillStyle = '#111';
-      ctx.fillRect(w*0.48, 9, w*0.04, h*0.05);
-
+      // --- WINDSHIELD (Drawn BEFORE Passengers so it is "in front" in physical Z space from chase cam perspective) ---
+      // In Chase cam: Camera -> Rear -> Passengers -> Dashboard -> Windshield.
+      // Painter's Algo (Back to Front): Windshield -> Dashboard -> Passengers -> Rear.
+      ctx.save();
+      
+      const wsTopW = carW * 0.7;
+      const wsBotW = carW * 0.82; // Matches Dash
+      const wsH = carH * 0.35;
+      const wsTopY = carY - wsH * 0.15; 
+      const wsBotY = carY + carH*0.35; // Starts at dashboard level
+      
+      // Frame
+      ctx.strokeStyle = '#888';
+      ctx.lineWidth = 3;
+      
+      // Glass
+      ctx.fillStyle = 'rgba(200, 240, 255, 0.4)'; 
+      
+      ctx.beginPath();
+      ctx.moveTo(destX - wsTopW/2, wsTopY); // Top Left
+      ctx.lineTo(destX + wsTopW/2, wsTopY); // Top Right
+      ctx.lineTo(destX + wsBotW/2, wsBotY); // Bottom Right
+      ctx.lineTo(destX - wsBotW/2, wsBotY); // Bottom Left
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      
+      // Reflection
+      ctx.strokeStyle = 'rgba(255,255,255,0.6)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(destX - wsTopW*0.3, wsTopY + wsH*0.2);
+      ctx.lineTo(destX - wsBotW*0.2, wsBotY - wsH*0.2);
+      ctx.stroke();
+      
       ctx.restore();
+
+      // --- DASHBOARD (Drawn BEFORE Passengers) ---
+      ctx.fillStyle = '#111';
+      // Covers bottom of passengers area
+      ctx.beginPath();
+      ctx.moveTo(carX + carW*0.15, carY + carH*0.45);
+      ctx.lineTo(carX + carW*0.85, carY + carH*0.45);
+      ctx.lineTo(carX + carW*0.80, carY + carH*0.35); // Dash top right
+      ctx.lineTo(carX + carW*0.20, carY + carH*0.35); // Dash top left
+      ctx.fill();
+
+      // --- INTERIOR & SEATS ---
+      ctx.fillStyle = interior;
+      ctx.beginPath();
+      ctx.moveTo(carX + carW*0.18, carY + carH*0.4);
+      ctx.lineTo(carX + carW*0.22, carY + carH*0.12); 
+      ctx.lineTo(carX + carW*0.78, carY + carH*0.12); 
+      ctx.lineTo(carX + carW*0.82, carY + carH*0.4);
+      ctx.fill();
+
+      // Headrests (Visible behind passengers, so drawn before them)
+      ctx.fillStyle = this.adjustBrightness('#8b4513', ambientLight); 
+      ctx.fillRect(carX + carW*0.25, carY + carH*0.08, carW*0.12, carH*0.15); // Left
+      ctx.fillRect(carX + carW*0.63, carY + carH*0.08, carW*0.12, carH*0.15); // Right
+
+      // --- PASSENGERS (Drawn ON TOP of dashboard/windshield layer to appear closer to camera) ---
+      const time = Date.now() / 100;
+      const hairWiggle = Math.sin(time * 2) * (speedPercent * 10);
+      
+      // 1. DRIVER (Left - Male)
+      const driverX = carX + carW * 0.31;
+      const driverY = carY + carH * 0.15;
+      
+      // Shirt (White)
+      ctx.fillStyle = this.adjustBrightness('#eeeeee', ambientLight);
+      ctx.beginPath(); ctx.ellipse(driverX, driverY + carH*0.15, carW*0.09, carH*0.12, 0, 0, Math.PI, true); ctx.fill();
+      // Head
+      ctx.fillStyle = this.adjustBrightness('#ffdbac', ambientLight);
+      ctx.beginPath(); ctx.arc(driverX, driverY, carW*0.05, 0, Math.PI*2); ctx.fill();
+      // Hair (Short Dark)
+      ctx.fillStyle = '#221100';
+      ctx.beginPath();
+      ctx.arc(driverX, driverY - carH*0.02, carW*0.055, Math.PI, 0); 
+      ctx.lineTo(driverX + carW*0.05, driverY + carH*0.05);
+      ctx.lineTo(driverX - carW*0.05, driverY + carH*0.05);
+      ctx.fill();
+      
+      // 2. PASSENGER (Right - Female)
+      const passX = carX + carW * 0.69;
+      const passY = carY + carH * 0.15;
+      // Dress (Pink)
+      ctx.fillStyle = this.adjustBrightness('#ff69b4', ambientLight); 
+      ctx.beginPath(); ctx.ellipse(passX, passY + carH*0.15, carW*0.08, carH*0.12, 0, 0, Math.PI, true); ctx.fill();
+      // Head
+      ctx.fillStyle = this.adjustBrightness('#ffdbac', ambientLight);
+      ctx.beginPath(); ctx.arc(passX, passY, carW*0.045, 0, Math.PI*2); ctx.fill();
+      // Hair (Blonde, Flowing)
+      ctx.fillStyle = '#fdd835'; 
+      ctx.beginPath();
+      ctx.arc(passX, passY - carH*0.02, carW*0.05, Math.PI, 0); 
+      const blowX = (Math.random() * 2 + 3) * speedPercent; 
+      const blowY = (Math.random() * 2 - 5) * speedPercent;
+      ctx.moveTo(passX - carW*0.05, passY);
+      ctx.quadraticCurveTo(passX - carW*0.08 - hairWiggle, passY + carH*0.2, passX - carW*0.04, passY + carH*0.3);
+      ctx.lineTo(passX + carW*0.05 + blowX, passY + carH*0.2 + blowY);
+      ctx.quadraticCurveTo(passX + carW*0.1, passY, passX + carW*0.05, passY - carH*0.05);
+      ctx.fill();
+
+      // --- SIDE MIRRORS (Draw here to be somewhat integrated with body) ---
+      ctx.fillStyle = red;
+      // Left Mirror Housing
+      ctx.beginPath();
+      ctx.moveTo(carX + carW*0.1, carY + carH*0.2);
+      ctx.lineTo(carX - carW*0.05, carY + carH*0.15);
+      ctx.lineTo(carX - carW*0.05, carY + carH*0.25);
+      ctx.lineTo(carX + carW*0.1, carY + carH*0.3);
+      ctx.fill();
+      // Left Mirror Reflection (Glass)
+      ctx.fillStyle = '#aaddff'; 
+      ctx.beginPath();
+      ctx.moveTo(carX + carW*0.08, carY + carH*0.21);
+      ctx.lineTo(carX - carW*0.04, carY + carH*0.16);
+      ctx.lineTo(carX - carW*0.04, carY + carH*0.24);
+      ctx.lineTo(carX + carW*0.08, carY + carH*0.29);
+      ctx.fill();
+
+      // Right Mirror Housing
+      ctx.fillStyle = red;
+      ctx.beginPath();
+      ctx.moveTo(carX + carW*0.9, carY + carH*0.2);
+      ctx.lineTo(carX + carW*1.05, carY + carH*0.15);
+      ctx.lineTo(carX + carW*1.05, carY + carH*0.25);
+      ctx.lineTo(carX + carW*0.9, carY + carH*0.3);
+      ctx.fill();
+      // Right Mirror Reflection (Glass)
+      ctx.fillStyle = '#aaddff';
+      ctx.beginPath();
+      ctx.moveTo(carX + carW*0.92, carY + carH*0.21);
+      ctx.lineTo(carX + carW*1.04, carY + carH*0.16);
+      ctx.lineTo(carX + carW*1.04, carY + carH*0.24);
+      ctx.lineTo(carX + carW*0.92, carY + carH*0.29);
+      ctx.fill();
+
+      // --- REAR GRILL (Testarossa Strakes) ---
+      // Black background panel
+      const grillY = carY + carH * 0.5;
+      const grillH = carH * 0.25;
+      ctx.fillStyle = '#111';
+      ctx.fillRect(carX + carW*0.02, grillY, carW*0.96, grillH);
+
+      // Taillights (behind strakes)
+      const brakeColor = braking ? '#ff0000' : '#aa0000';
+      const brakeGlow = braking ? 20 : 0;
+      ctx.fillStyle = brakeColor;
+      if (braking) {
+        ctx.shadowColor = '#ff0000';
+        ctx.shadowBlur = brakeGlow;
+      }
+      ctx.fillRect(carX + carW*0.05, grillY + grillH*0.1, carW*0.25, grillH*0.8);
+      ctx.fillRect(carX + carW*0.7, grillY + grillH*0.1, carW*0.25, grillH*0.8);
+      ctx.shadowBlur = 0;
+
+      // License Plate
+      ctx.fillStyle = '#ffcc00'; 
+      ctx.fillRect(carX + carW*0.42, grillY + grillH*0.2, carW*0.16, grillH*0.6);
+      ctx.fillStyle = '#000';
+      ctx.font = `bold ${Math.floor(carH*0.12)}px sans-serif`;
+      ctx.textAlign = 'center';
+      ctx.fillText("OUTRUN", carX + carW*0.5, grillY + grillH*0.65);
+
+      // Strakes (Horizontal Lines)
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; 
+      const slatCount = 5;
+      const slatH = grillH / (slatCount * 2 + 1);
+      for(let i=0; i<slatCount; i++) {
+          const sy = grillY + (i * slatH * 2) + slatH;
+          ctx.fillRect(carX + carW*0.02, sy, carW*0.96, slatH);
+      }
+
+      // Ferrari Badge
+      ctx.fillStyle = '#ffff00';
+      ctx.beginPath();
+      ctx.arc(carX + carW*0.5, carY + carH*0.42, carW*0.02, 0, Math.PI*2);
+      ctx.fill();
+
+      // Smoke
+      if (speedPercent > 0.8 && !braking) {
+           ctx.fillStyle = 'rgba(200,200,200,0.3)';
+           const fumeX = (Math.random() > 0.5 ? carX + carW*0.15 : carX + carW*0.85) + (Math.random()*10 - 5);
+           const fumeY = exY + Math.random() * 10;
+           ctx.beginPath(); ctx.arc(fumeX, fumeY, carW*0.06 * Math.random(), 0, Math.PI*2); ctx.fill();
+      }
+  }
+
+  // Helper for drawing realistic water (Stages 1 & 4)
+  private drawWaterSurface(ctx: CanvasRenderingContext2D, segment: Segment, p1: ScreenPoint, p2: ScreenPoint, waterColorBase: string, ambientLight: number, x1: number, x2: number) {
+      const waterColor = this.adjustBrightness(waterColorBase, ambientLight); 
+      
+      const waterRightBound = x1 + 5000; // Draw far to right if x1 is left edge, or just fill
+      // In stage 1 we pass x1 as the start (beach edge), x2 as the end (0)
+      
+      ctx.fillStyle = waterColor;
+      ctx.beginPath();
+      ctx.moveTo(x1, p1.y);
+      ctx.lineTo(x2, p1.y);
+      ctx.lineTo(x2, p2.y);
+      ctx.lineTo(x1 + (p2.x - p1.x), p2.y); // Parallel logic approx
+      ctx.fill();
+
+      // Draw Wave Highlight Lines
+      const time = Date.now() / 500;
+      
+      if (segment.index % 3 === 0) {
+          const highlightColor = this.adjustBrightness(waterColorBase, ambientLight + 0.3);
+          ctx.fillStyle = highlightColor;
+          
+          const waveY = p1.y + (p2.y - p1.y) * 0.5;
+          const waveH = (p2.y - p1.y) * 0.2;
+          
+          // Draw wave from start x to end x
+          ctx.fillRect(Math.min(x1, x2), waveY, Math.abs(x2 - x1), waveH);
+      }
   }
 
   public render(opts: RenderContext) {
@@ -1413,11 +1137,8 @@ export class Renderer {
 
     ctx.clearRect(0, 0, width, height);
     
-    // Draw Background and get current ambient light level (0.0 - 1.0)
-    // Pass stage
     const ambientLight = this.drawBackground(ctx, width, height, background, stage);
 
-    // If fireworks present, draw in sky
     if (fireworks && fireworks.length > 0) {
         this.drawFireworks(ctx, fireworks);
     }
@@ -1445,90 +1166,108 @@ export class Renderer {
 
         if (segment.p1Screen.y <= segment.p2Screen.y || segment.p2Screen.y >= maxy) continue;
 
-        // Apply brightness to colors
-        // Stage 5 has custom colors in segment, ambientLight still applies
         const grassColor = this.adjustBrightness(segment.color.grass, ambientLight);
         const roadColor = this.adjustBrightness(segment.color.road, ambientLight);
         const rumbleColor = this.adjustBrightness(segment.color.rumble, ambientLight);
         const laneColor = this.adjustBrightness(segment.color.lane, ambientLight);
 
-        // Stage 5 water effect is handled by drawBackground, so grass can be transparent or dark
-        // If grass is transparent, we see the background (water)
-        if (stage === 5 && segment.color.grass === '#000000') {
-            // Draw nothing for grass, letting background show through
-            // FIX: Draw "skirt" to prevent floating road look on hills
-            // Draw a polygon from road edge down to bottom of screen (or deep enough)
-            ctx.fillStyle = ambientLight > 0.5 ? '#110022' : '#000000'; // Dark foundation color
+        // --- STAGE SPECIFIC TERRAIN RENDERING ---
+
+        if (stage === 5) {
+             // STAGE 5: Synthwave Coast
+             // Left Side: Neon Ocean Grid
+             
+             // Calculate Land Width (Similar to Stage 1 Beach)
+             const landWidth1 = segment.p1Screen.w * 3;
+             const landWidth2 = segment.p2Screen.w * 3;
+             
+             const roadLeft1 = segment.p1Screen.x - segment.p1Screen.w;
+             const roadLeft2 = segment.p2Screen.x - segment.p2Screen.w;
+             
+             const waterStart1 = roadLeft1 - landWidth1;
+             const waterStart2 = roadLeft2 - landWidth2;
+
+             // 1. Draw Water (From 0 to waterStart)
+             const waterBase = '#2a0a3a'; 
+             const waterColor = this.adjustBrightness(waterBase, ambientLight * 0.8); 
+             ctx.fillStyle = waterColor;
+             ctx.beginPath();
+             ctx.moveTo(0, segment.p1Screen.y);
+             ctx.lineTo(waterStart1, segment.p1Screen.y);
+             ctx.lineTo(waterStart2, segment.p2Screen.y);
+             ctx.lineTo(0, segment.p2Screen.y);
+             ctx.fill();
+
+             // Grid Lines on Water
+             const gridColor = this.adjustBrightness('#00ffff', ambientLight); // Cyan
+             const timeOffset = Math.floor(Date.now() / 50) % 10;
+             if ((segment.index + timeOffset) % 4 === 0) {
+                 ctx.fillStyle = gridColor;
+                 ctx.fillRect(0, segment.p2Screen.y, waterStart2, segment.p1Screen.y - segment.p2Screen.y);
+             }
+             
+             // 2. Draw Ground (Grid from waterStart to Road)
+             const groundColor = this.adjustBrightness('#110522', ambientLight); 
+             ctx.fillStyle = groundColor;
+             ctx.beginPath();
+             ctx.moveTo(waterStart1, segment.p1Screen.y);
+             ctx.lineTo(roadLeft1, segment.p1Screen.y);
+             ctx.lineTo(roadLeft2, segment.p2Screen.y);
+             ctx.lineTo(waterStart2, segment.p2Screen.y);
+             ctx.fill();
+
+             // 3. Draw Right Side Ground
+             this.drawPolygon(ctx, segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y, width, segment.p1Screen.y, width, segment.p2Screen.y, segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y, groundColor);
+
+        } else if (stage === 4) {
+             // STAGE 4: Lake Right
+             this.drawPolygon(ctx, 0, segment.p2Screen.y, segment.p2Screen.x - segment.p2Screen.w, segment.p2Screen.y, segment.p1Screen.x - segment.p1Screen.w, segment.p1Screen.y, 0, segment.p1Screen.y, grassColor);
+             // Water starts at road edge
+             this.drawWaterSurface(ctx, segment, segment.p1Screen, segment.p2Screen, '#2b4c6f', ambientLight, segment.p1Screen.x + segment.p1Screen.w, width);
+
+        } else if (stage === 1) {
+            // STAGE 1: Beach Left
+            // Calculate Beach Width to push water away
+            const beachWidth1 = segment.p1Screen.w * 3;
+            const beachWidth2 = segment.p2Screen.w * 3;
             
-            // Left Foundation
+            const roadLeft1 = segment.p1Screen.x - segment.p1Screen.w;
+            const roadLeft2 = segment.p2Screen.x - segment.p2Screen.w;
+            
+            const waterStart1 = roadLeft1 - beachWidth1;
+            const waterStart2 = roadLeft2 - beachWidth2;
+
+            // Draw Water (From 0 to waterStart)
+            this.drawWaterSurface(ctx, segment, segment.p1Screen, segment.p2Screen, '#006994', ambientLight, 0, waterStart1);
+            
+            // Draw Sand Beach (Between water and road)
+            const sandColor = this.adjustBrightness('#eecfaa', ambientLight);
+            ctx.fillStyle = sandColor;
             ctx.beginPath();
-            ctx.moveTo(0, segment.p2Screen.y);
-            ctx.lineTo(segment.p2Screen.x - segment.p2Screen.w, segment.p2Screen.y);
-            ctx.lineTo(segment.p1Screen.x - segment.p1Screen.w, segment.p1Screen.y);
-            ctx.lineTo(0, segment.p1Screen.y);
+            ctx.moveTo(waterStart1, segment.p1Screen.y);
+            ctx.lineTo(roadLeft1, segment.p1Screen.y);
+            ctx.lineTo(roadLeft2, segment.p2Screen.y);
+            ctx.lineTo(waterStart2, segment.p2Screen.y);
             ctx.fill();
 
-            // Right Foundation
-            ctx.beginPath();
-            ctx.moveTo(width, segment.p2Screen.y);
-            ctx.lineTo(segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y);
-            ctx.lineTo(segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y);
-            ctx.lineTo(width, segment.p1Screen.y);
-            ctx.fill();
-
+            // Draw Ground Right
+            this.drawPolygon(ctx, segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y, width, segment.p1Screen.y, width, segment.p2Screen.y, segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y, grassColor);
         } else {
-            // Standard Grass Drawing
-            // LEFT SIDE
+            // Standard Grass
             this.drawPolygon(ctx, 0, segment.p2Screen.y, width, segment.p2Screen.y, width, segment.p1Screen.y, 0, segment.p1Screen.y, grassColor);
-            
-            // STAGE 1 GEOMETRY FIX:
-            if (stage === 1) {
-                // FIXED SLOPE CALCULATION based on horizon geometry relative to road edge
-                // Right Side (UP): Hill
-                // We draw a polygon from the right road edge up to the screen edge but higher up.
-                
-                // Height variance using sine wave based on Z position (n)
-                const heightVar = Math.sin(segment.index * 0.1) * 0.5 + 0.5; // 0.0 to 1.0
-                const hillHeightY = (segment.p1Screen.y - (height/2)) * (0.8 + heightVar * 0.4); 
-                
-                // Draw Right Hill
-                ctx.fillStyle = grassColor;
-                ctx.beginPath();
-                ctx.moveTo(segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y);
-                ctx.lineTo(segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y);
-                ctx.lineTo(width, segment.p2Screen.y - hillHeightY);
-                ctx.lineTo(width, segment.p1Screen.y - hillHeightY);
-                ctx.fill();
-
-                // Left Side (DOWN): Embankment / Cliff
-                // We draw a polygon from left road edge down to screen edge but lower down.
-                const dropY = (segment.p1Screen.y - (height/2)) * 0.5;
-                ctx.fillStyle = this.adjustBrightness(grassColor, 0.8); // Darker side
-                ctx.beginPath();
-                ctx.moveTo(segment.p1Screen.x - segment.p1Screen.w, segment.p1Screen.y);
-                ctx.lineTo(segment.p2Screen.x - segment.p2Screen.w, segment.p2Screen.y);
-                ctx.lineTo(0, segment.p2Screen.y + dropY);
-                ctx.lineTo(0, segment.p1Screen.y + dropY);
-                ctx.fill();
-            }
         }
 
-        // Draw Full Road (Including areas where rumble might sit)
-        this.drawPolygon(ctx, segment.p1Screen.x, segment.p1Screen.y, segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y, segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y, segment.p2Screen.x, segment.p2Screen.y, roadColor);
+        // Draw Full Road
+        this.drawPolygon(ctx, segment.p1Screen.x - segment.p1Screen.w, segment.p1Screen.y, segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y, segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y, segment.p2Screen.x - segment.p2Screen.w, segment.p2Screen.y, roadColor);
 
-        // Rumble Strips
         const r1 = segment.p1Screen.w / 6;
         const r2 = segment.p2Screen.w / 6;
-        this.drawPolygon(ctx, segment.p1Screen.x - r1, segment.p1Screen.y, segment.p1Screen.x, segment.p1Screen.y, segment.p2Screen.x, segment.p2Screen.y, segment.p2Screen.x - r2, segment.p2Screen.y, rumbleColor);
+        this.drawPolygon(ctx, segment.p1Screen.x - segment.p1Screen.w - r1, segment.p1Screen.y, segment.p1Screen.x - segment.p1Screen.w, segment.p1Screen.y, segment.p2Screen.x - segment.p2Screen.w, segment.p2Screen.y, segment.p2Screen.x - segment.p2Screen.w - r2, segment.p2Screen.y, rumbleColor);
         this.drawPolygon(ctx, segment.p1Screen.x + segment.p1Screen.w, segment.p1Screen.y, segment.p1Screen.x + segment.p1Screen.w + r1, segment.p1Screen.y, segment.p2Screen.x + segment.p2Screen.w + r2, segment.p2Screen.y, segment.p2Screen.x + segment.p2Screen.w, segment.p2Screen.y, rumbleColor);
 
-        // --- LANE MARKINGS (Revised for 3 Distinct Lanes) ---
         if (segment.color.lane) {
              const w1 = segment.p1Screen.w;
              const w2 = segment.p2Screen.w;
-             
-             // Dashed Lane Markers (Dividing lines)
-             // Lanes are at -0.33 and +0.33 of half-width W
              const markerW1 = w1 / 32;
              const markerW2 = w2 / 32;
 
@@ -1540,19 +1279,14 @@ export class Renderer {
 
              this.drawPolygon(ctx, leftDividerX1, segment.p1Screen.y, leftDividerX1 + markerW1, segment.p1Screen.y, leftDividerX2 + markerW2, segment.p2Screen.y, leftDividerX2, segment.p2Screen.y, laneColor);
              this.drawPolygon(ctx, rightDividerX1, segment.p1Screen.y, rightDividerX1 + markerW1, segment.p1Screen.y, rightDividerX2 + markerW2, segment.p2Screen.y, rightDividerX2, segment.p2Screen.y, laneColor);
-
-             // --- EDGE LINES (Solid lines defining road boundary) ---
-             // To clearly distinguish the outer lanes from the shoulder
+             
              const edgeW1 = w1 / 24; 
              const edgeW2 = w2 / 24;
              
-             // Left Edge (Just inside rumble strip)
-             // FIX: Adjusted position to be exactly at road edge minus width
              const leftEdgeX1 = segment.p1Screen.x - w1;
              const leftEdgeX2 = segment.p2Screen.x - w2;
              this.drawPolygon(ctx, leftEdgeX1, segment.p1Screen.y, leftEdgeX1 + edgeW1, segment.p1Screen.y, leftEdgeX2 + edgeW2, segment.p2Screen.y, leftEdgeX2, segment.p2Screen.y, '#ffffff');
 
-             // Right Edge
              const rightEdgeX1 = segment.p1Screen.x + w1 - edgeW1;
              const rightEdgeX2 = segment.p2Screen.x + w2 - edgeW2;
              this.drawPolygon(ctx, rightEdgeX1, segment.p1Screen.y, rightEdgeX1 + edgeW1, segment.p1Screen.y, rightEdgeX2 + edgeW2, segment.p2Screen.y, rightEdgeX2, segment.p2Screen.y, '#ffffff');
@@ -1561,7 +1295,6 @@ export class Renderer {
         maxy = segment.p2Screen.y;
     }
 
-    // Draw Sprites
     for(let n = segments.length - 1; n > 0 ; n--) {
         const segment = segments[n];
         const scale = segment.p1Screen.scale;
@@ -1569,7 +1302,6 @@ export class Renderer {
         for(let i = 0; i < segment.sprites.length; i++) {
             const sprite = segment.sprites[i];
             const destX = segment.p1Screen.x + (scale * sprite.offset * roadWidth * width / 2);
-            // Pass absolute segment.index + i as seed for stability
             this.drawSprite(ctx, width, height, width/1000, roadWidth, sprite.type, scale, destX, segment.p1Screen.y, segment.clip, ambientLight, segment.index + i, sprite.offset);
         }
 
@@ -1577,7 +1309,6 @@ export class Renderer {
              const car = segment.cars[i];
              const destX = segment.p1Screen.x + (scale * car.offset * roadWidth * width / 2);
              const spriteType = car.sprite === 'NPC' ? SpriteType.CAR_NPC : car.sprite;
-             // FIX: Use car.id instead of segment.index + i to prevent flickering colors
              this.drawSprite(ctx, width, height, width/1000, roadWidth, spriteType, scale, destX, segment.p1Screen.y, segment.clip, ambientLight, car.id, car.offset);
         }
     }
